@@ -332,6 +332,18 @@ Assert-Pass 'hardening deceptive quoted event definition is rejected' {
     }
 }
 
+Assert-Pass 'hardening event literal preserves internal whitespace' {
+    Assert-RejectedMutation -Name 'event literal whitespace' -ExpectedPattern '\[event-centralization\]' -Mutate {
+        param($fixture)
+        $path = Join-Path $fixture 'LuaSource_云上同行\config\events.lua'
+        $content = [System.IO.File]::ReadAllText($path, $utf8).Replace(
+            '"CLOUD_JOURNEY.CORE_READY"',
+            '"CLOUD_JOURNEY.CORE_ READY"'
+        )
+        Write-Utf8File -Path $path -Content $content
+    }
+}
+
 Assert-Pass 'hardening extra lowercase event field is rejected' {
     Assert-RejectedMutation -Name 'lowercase event field' -ExpectedPattern '\[event-centralization\]' -Mutate {
         param($fixture)

@@ -54,6 +54,27 @@ function Replace-LuaLexicalTokens {
     return [regex]::Replace($Text, $luaLexicalPattern, $evaluator)
 }
 
+function Normalize-LuaCodeWhitespace {
+    param([string]$Text)
+
+    $builder = [System.Text.StringBuilder]::new()
+    $offset = 0
+    foreach ($match in [regex]::Matches($Text, $luaLexicalPattern)) {
+        if ($match.Index -gt $offset) {
+            $codeSpan = $Text.Substring($offset, $match.Index - $offset)
+            $null = $builder.Append([regex]::Replace($codeSpan, '\s+', ''))
+        }
+        if (-not $match.Value.StartsWith('--', [System.StringComparison]::Ordinal)) {
+            $null = $builder.Append($match.Value)
+        }
+        $offset = $match.Index + $match.Length
+    }
+    if ($offset -lt $Text.Length) {
+        $null = $builder.Append([regex]::Replace($Text.Substring($offset), '\s+', ''))
+    }
+    return $builder.ToString()
+}
+
 function Get-LuaRequireView {
     param([string]$Text)
 
@@ -237,8 +258,8 @@ if (Test-Path -LiteralPath $objectsPath -PathType Leaf) {
 $eventsPath = Join-Path $runtimeRoot 'config\events.lua'
 $definedEventKeys = @{}
 if (Test-Path -LiteralPath $eventsPath -PathType Leaf) {
-    $eventsCode = Replace-LuaLexicalTokens -Text (Read-Utf8File -Path $eventsPath) -RemoveStrings $false
-    $normalizedEventsCode = [regex]::Replace($eventsCode, '\s+', '')
+    $eventsCode = Read-Utf8File -Path $eventsPath
+    $normalizedEventsCode = Normalize-LuaCodeWhitespace -Text $eventsCode
     $expectedEventsCode = 'localevents={CORE_READY="CLOUD_JOURNEY.CORE_READY",}returnevents'
     if ($normalizedEventsCode -cne $expectedEventsCode) {
         Add-Failure -Category 'event-centralization' -Message 'config/events.lua must define only CORE_READY'

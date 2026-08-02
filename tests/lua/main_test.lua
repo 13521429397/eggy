@@ -25,6 +25,10 @@ local function load_app(options)
     local evidence = {
         calls = {},
         callbacks = {},
+        callback_history = {
+            game_init = {},
+            game_end = {},
+        },
         start_calls = 0,
         error_calls = 0,
         event_dispose_calls = 0,
@@ -35,7 +39,11 @@ local function load_app(options)
     end
 
     local u5_log = {
-        init = function() called("u5_log.init") return options.u5_log_init ~= false end,
+        init = function()
+            called("u5_log.init")
+            if options.u5_log_init_hook then options.u5_log_init_hook() end
+            return options.u5_log_init ~= false
+        end,
         dispose = function() called("u5_log.dispose") return true end,
     }
     local logger = {
@@ -54,6 +62,7 @@ local function load_app(options)
     local game_flow = {
         init = function() called("game_flow.init") return options.game_flow_init ~= false end,
         start = function()
+            called("game_flow.start")
             evidence.start_calls = evidence.start_calls + 1
             return options.start_result ~= false
         end,
@@ -64,18 +73,23 @@ local function load_app(options)
         on_game_init = function(callback)
             called("u5_event.on_game_init")
             evidence.callbacks.game_init = callback
+            evidence.callback_history.game_init[#evidence.callback_history.game_init + 1] = callback
+            if options.sync_game_init then callback() end
             if options.game_init_registration == false then return nil end
             return 101
         end,
         on_game_end = function(callback)
             called("u5_event.on_game_end")
             evidence.callbacks.game_end = callback
+            evidence.callback_history.game_end[#evidence.callback_history.game_end + 1] = callback
+            if options.sync_game_end then callback() end
             if options.game_end_registration == false then return nil end
             return 102
         end,
         dispose = function()
             called("u5_event.dispose")
             evidence.event_dispose_calls = evidence.event_dispose_calls + 1
+            if options.event_dispose_hook then options.event_dispose_hook() end
             local results = options.event_dispose_results or { true }
             local result = results[evidence.event_dispose_calls]
             if result == nil then return true end
@@ -179,6 +193,121 @@ test.test("main disposes on GAME_END and can initialize a new lifetime", functio
     test.truthy(app.dispose())
     test.truthy(app.init())
     test.equal(evidence.calls[#evidence.calls], "u5_event.on_game_end")
+end)
+
+test.test("main replays synchronous GAME_INIT after both registrations are owned", function()
+    local options = {}
+    local app, evidence = load_app(options)
+    test.truthy(app.dispose())
+    options.sync_game_init = true
+
+    test.truthy(app.init())
+    test.equal(evidence.start_calls, 1)
+    test.sequence({
+        evidence.calls[#evidence.calls - 2],
+        evidence.calls[#evidence.calls - 1],
+        evidence.calls[#evidence.calls],
+    }, {
+        "u5_event.on_game_init",
+        "u5_event.on_game_end",
+        "game_flow.start",
+    })
+    evidence.callbacks.game_init()
+    test.equal(evidence.start_calls, 1)
+end)
+
+test.test("main lets synchronous GAME_END cancel pending GAME_INIT", function()
+    local options = {}
+    local app, evidence = load_app(options)
+    test.truthy(app.dispose())
+    options.sync_game_init = true
+    options.sync_game_end = true
+
+    test.falsy(app.init())
+    test.equal(evidence.start_calls, 0)
+    test.sequence({
+        evidence.calls[#evidence.calls - 5],
+        evidence.calls[#evidence.calls - 4],
+        evidence.calls[#evidence.calls - 3],
+        evidence.calls[#evidence.calls - 2],
+        evidence.calls[#evidence.calls - 1],
+        evidence.calls[#evidence.calls],
+    }, {
+        "u5_event.dispose",
+        "game_flow.dispose",
+        "object_registry.dispose",
+        "event_bus.dispose",
+        "logger.dispose",
+        "u5_log.dispose",
+    })
+
+    options.sync_game_init = false
+    options.sync_game_end = false
+    test.truthy(app.init())
+    test.equal(evidence.calls[#evidence.calls], "u5_event.on_game_end")
+end)
+
+test.test("main ignores callbacks retained from an earlier lifetime", function()
+    local app, evidence = load_app()
+    local old_game_init = evidence.callback_history.game_init[1]
+    local old_game_end = evidence.callback_history.game_end[1]
+
+    test.truthy(app.dispose())
+    test.truthy(app.init())
+    local new_game_init = evidence.callback_history.game_init[2]
+    local new_game_end = evidence.callback_history.game_end[2]
+    local call_count = #evidence.calls
+    local event_dispose_calls = evidence.event_dispose_calls
+
+    old_game_init()
+    old_game_end()
+    test.equal(#evidence.calls, call_count)
+    test.equal(evidence.start_calls, 0)
+    test.equal(evidence.event_dispose_calls, event_dispose_calls)
+
+    new_game_init()
+    test.equal(evidence.start_calls, 1)
+    new_game_end()
+    test.equal(evidence.event_dispose_calls, event_dispose_calls + 1)
+    test.sequence({
+        evidence.calls[#evidence.calls - 5],
+        evidence.calls[#evidence.calls - 4],
+        evidence.calls[#evidence.calls - 3],
+        evidence.calls[#evidence.calls - 2],
+        evidence.calls[#evidence.calls - 1],
+        evidence.calls[#evidence.calls],
+    }, {
+        "u5_event.dispose",
+        "game_flow.dispose",
+        "object_registry.dispose",
+        "event_bus.dispose",
+        "logger.dispose",
+        "u5_log.dispose",
+    })
+end)
+
+test.test("main rejects reentrant initialization and cleanup calls", function()
+    local options = {}
+    local app = load_app(options)
+    local initializing_init_result = nil
+    local disposing_init_result = nil
+    local reentrant_dispose_result = nil
+
+    test.truthy(app.dispose())
+    options.u5_log_init_hook = function()
+        initializing_init_result = app.init()
+    end
+    test.truthy(app.init())
+    test.falsy(initializing_init_result)
+    options.u5_log_init_hook = nil
+
+    options.event_dispose_hook = function()
+        disposing_init_result = app.init()
+        reentrant_dispose_result = app.dispose()
+    end
+    test.truthy(app.dispose())
+    test.falsy(disposing_init_result)
+    test.falsy(reentrant_dispose_result)
 end)
 
 for _, module_name in ipairs(module_names) do

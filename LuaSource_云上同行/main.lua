@@ -11,6 +11,7 @@ local app = {}
 
 local STATE = {
     NEW = "NEW",
+    INITIALIZING = "INITIALIZING",
     INITIALIZED = "INITIALIZED",
     DISPOSING = "DISPOSING",
     DISPOSED = "DISPOSED",
@@ -18,6 +19,10 @@ local STATE = {
 
 local state = STATE.NEW
 local game_init_received = false
+local pending_game_init = false
+local pending_game_end = false
+local active_lifetime_token = nil
+local cleanup_in_progress = false
 local completed = {
     u5_log = false,
     logger = false,
@@ -32,12 +37,28 @@ local game_flow_dependencies = {
     events = events,
 }
 
+local function invalidate_active_lifetime()
+    -- 清理前先使本轮令牌失效，避免迟到回调影响下一轮生命周期。
+    active_lifetime_token = nil
+    pending_game_init = false
+    pending_game_end = false
+    game_init_received = false
+end
+
 local function cleanup_completed()
+    if cleanup_in_progress then
+        return false
+    end
+
+    cleanup_in_progress = true
+    invalidate_active_lifetime()
+
     if completed.u5_event then
         -- 平台事件必须先释放；失败时保留日志和其余依赖供后续重试。
         if not u5_event.dispose() then
             state = STATE.DISPOSING
             logger.error("App", "平台事件清理未完成，将在后续 dispose 重试")
+            cleanup_in_progress = false
             return false
         end
         completed.u5_event = false
@@ -64,12 +85,13 @@ local function cleanup_completed()
         completed.u5_log = false
     end
 
-    game_init_received = false
     state = STATE.DISPOSED
+    cleanup_in_progress = false
     return true
 end
 
 local function fail_initialization(message)
+    invalidate_active_lifetime()
     if completed.logger then
         logger.error("App", message)
     end
@@ -78,7 +100,16 @@ local function fail_initialization(message)
     return false
 end
 
-local function on_game_init()
+local function on_game_init(lifetime_token)
+    if lifetime_token ~= active_lifetime_token then
+        return
+    end
+    if state == STATE.INITIALIZING then
+        if not pending_game_end then
+            pending_game_init = true
+        end
+        return
+    end
     if state ~= STATE.INITIALIZED or game_init_received then
         return
     end
@@ -90,7 +121,20 @@ local function on_game_init()
     end
 end
 
-local function on_game_end()
+local function on_game_end(lifetime_token)
+    if lifetime_token ~= active_lifetime_token then
+        return
+    end
+    if state == STATE.INITIALIZING then
+        -- 注册期间 GAME_END 优先，阻止尚未重放的 GAME_INIT 启动游戏。
+        pending_game_end = true
+        pending_game_init = false
+        return
+    end
+    if state ~= STATE.INITIALIZED then
+        return
+    end
+
     app.dispose()
 end
 
@@ -98,13 +142,19 @@ function app.init()
     if state == STATE.INITIALIZED then
         return true
     end
-    if state == STATE.DISPOSING then
+    if state == STATE.INITIALIZING or state == STATE.DISPOSING then
         return false
     end
 
+    state = STATE.INITIALIZING
     game_init_received = false
+    pending_game_init = false
+    pending_game_end = false
+    local lifetime_token = {}
+    active_lifetime_token = lifetime_token
 
     if not u5_log.init() then
+        invalidate_active_lifetime()
         state = STATE.DISPOSED
         return false
     end
@@ -135,14 +185,27 @@ function app.init()
     end
     completed.u5_event = true
 
-    if u5_event.on_game_init(on_game_init) == nil then
+    if u5_event.on_game_init(function()
+        on_game_init(lifetime_token)
+    end) == nil then
         return fail_initialization("GAME_INIT 注册失败")
     end
-    if u5_event.on_game_end(on_game_end) == nil then
+    if u5_event.on_game_end(function()
+        on_game_end(lifetime_token)
+    end) == nil then
         return fail_initialization("GAME_END 注册失败")
     end
 
     state = STATE.INITIALIZED
+    if pending_game_end then
+        state = STATE.DISPOSING
+        cleanup_completed()
+        return false
+    end
+    if pending_game_init then
+        pending_game_init = false
+        on_game_init(lifetime_token)
+    end
     return true
 end
 
@@ -154,6 +217,9 @@ function app.dispose()
     end
     if state == STATE.DISPOSED then
         return true
+    end
+    if cleanup_in_progress then
+        return false
     end
 
     state = STATE.DISPOSING

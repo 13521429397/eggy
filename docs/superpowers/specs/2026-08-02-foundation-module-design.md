@@ -1,6 +1,6 @@
 # Foundation Module Design
 
-Status: Approved approach, awaiting written-spec review
+Status: Approved
 Project: Cloud Journey (`云上同行`)
 Date: 2026-08-02
 

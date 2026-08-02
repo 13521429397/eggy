@@ -1,5 +1,6 @@
 ﻿param(
-    [string]$EggyApiPath
+    [string]$EggyApiPath,
+    [string]$NamePattern = '.*'
 )
 
 Set-StrictMode -Version Latest
@@ -41,17 +42,40 @@ function New-FoundationFixture {
 
 function Remove-FoundationFixture {
     param([string]$Path)
-    $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
-    $resolved = [System.IO.Path]::GetFullPath($Path)
-    if (-not $resolved.StartsWith($tempRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+
+    $trimSeparators = [char[]]@('\', '/')
+    $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd($trimSeparators)
+    $resolved = [System.IO.Path]::GetFullPath($Path).TrimEnd($trimSeparators)
+    if ($resolved.Equals($tempRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "Refusing to remove non-temporary fixture: $resolved"
     }
+    if (-not (Test-Path -LiteralPath $resolved -PathType Container)) {
+        throw "Refusing to remove missing fixture: $resolved"
+    }
+
+    $item = Get-Item -LiteralPath $resolved -Force
+    $resolved = [System.IO.Path]::GetFullPath($item.FullName).TrimEnd($trimSeparators)
+    $parent = [System.IO.Path]::GetDirectoryName($resolved)
+    $leaf = [System.IO.Path]::GetFileName($resolved)
+    if (-not $parent.Equals($tempRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove non-temporary fixture: $resolved"
+    }
+    if ($leaf -cnotmatch '^eggy-foundation-[0-9a-f]{32}$') {
+        throw "Refusing to remove unexpected fixture name: $resolved"
+    }
+    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing to remove reparse-point fixture: $resolved"
+    }
+
     Remove-Item -LiteralPath $resolved -Recurse -Force
 }
 
 function Invoke-FoundationVerifier {
-    param([string]$Root)
-    $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $verifierPath -Root $Root -EggyApiPath $EggyApiPath 2>&1
+    param(
+        [string]$Root,
+        [string]$ApiPath = $EggyApiPath
+    )
+    $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $verifierPath -Root $Root -EggyApiPath $ApiPath 2>&1
     return [pscustomobject]@{
         ExitCode = $LASTEXITCODE
         Output = ($output -join [Environment]::NewLine)
@@ -60,12 +84,32 @@ function Invoke-FoundationVerifier {
 
 function Assert-Pass {
     param([string]$Name, [scriptblock]$Action)
+    if ($Name -notmatch $NamePattern) {
+        return
+    }
     try {
         & $Action
         Write-Output "[PASS] $Name"
     } catch {
         $failures.Add("${Name}: $($_.Exception.Message)")
         Write-Output "[FAIL] ${Name}: $($_.Exception.Message)"
+    }
+}
+
+function Assert-CleanupRejected {
+    param([string]$Path)
+
+    $rejected = $false
+    try {
+        Remove-FoundationFixture -Path $Path
+    } catch {
+        $rejected = $true
+    }
+    if (-not $rejected) {
+        throw "Cleanup guard accepted invalid path: $Path"
+    }
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "Cleanup guard deleted rejected path: $Path"
     }
 }
 
@@ -167,6 +211,32 @@ Assert-Pass 'rejects require aliases' {
     }
 }
 
+Assert-Pass 'hardening canonical require rejects leading dots' {
+    Assert-RejectedMutation -Name 'leading dots' -ExpectedPattern '\[require-target\]' -Mutate {
+        param($fixture)
+        $path = Join-Path $fixture 'LuaSource_云上同行\main.lua'
+        $content = "local leadingOne = require(`".core.logger`")`n"
+        $content += "local leadingMany = require(`"..core.logger`")`n"
+        Add-LuaBeforeFinalReturn -Path $path -Content $content
+    }
+}
+
+Assert-Pass 'hardening canonical require rejects a trailing dot' {
+    Assert-RejectedMutation -Name 'trailing dot' -ExpectedPattern '\[require-target\]' -Mutate {
+        param($fixture)
+        $path = Join-Path $fixture 'LuaSource_云上同行\main.lua'
+        Add-LuaBeforeFinalReturn -Path $path -Content "local leaked = require(`"core.logger.`")`n"
+    }
+}
+
+Assert-Pass 'hardening canonical require rejects repeated dots' {
+    Assert-RejectedMutation -Name 'repeated dots' -ExpectedPattern '\[require-target\]' -Mutate {
+        param($fixture)
+        $path = Join-Path $fixture 'LuaSource_云上同行\main.lua'
+        Add-LuaBeforeFinalReturn -Path $path -Content "local leaked = require(`"core..logger`")`n"
+    }
+}
+
 Assert-Pass 'rejects bare dynamic loading' {
     Assert-RejectedMutation -Name 'bare dynamic load' -ExpectedPattern '\[forbidden-runtime\]' -Mutate {
         param($fixture)
@@ -248,6 +318,96 @@ Assert-Pass 'rejects event keys absent from central configuration' {
         $path = Join-Path $fixture 'LuaSource_云上同行\config\events.lua'
         $content = [System.IO.File]::ReadAllText($path, $utf8).Replace('CORE_READY', 'RENAMED_READY')
         Write-Utf8File -Path $path -Content $content
+    }
+}
+
+Assert-Pass 'hardening deceptive quoted event definition is rejected' {
+    Assert-RejectedMutation -Name 'quoted fake definition' -ExpectedPattern '\[event-centralization\]' -Mutate {
+        param($fixture)
+        $path = Join-Path $fixture 'LuaSource_云上同行\config\events.lua'
+        $content = "local events = {}`n"
+        $content += 'local fake = [=[CORE_READY = "CLOUD_JOURNEY.CORE_READY"]=]' + "`n"
+        $content += "return events`n"
+        Write-Utf8File -Path $path -Content $content
+    }
+}
+
+Assert-Pass 'hardening extra lowercase event field is rejected' {
+    Assert-RejectedMutation -Name 'lowercase event field' -ExpectedPattern '\[event-centralization\]' -Mutate {
+        param($fixture)
+        $path = Join-Path $fixture 'LuaSource_云上同行\config\events.lua'
+        $content = [System.IO.File]::ReadAllText($path, $utf8).Replace('CORE_READY =', "extra = true,`n    CORE_READY =")
+        Write-Utf8File -Path $path -Content $content
+    }
+}
+
+Assert-Pass 'hardening bracket event field is rejected' {
+    Assert-RejectedMutation -Name 'bracket event field' -ExpectedPattern '\[event-centralization\]' -Mutate {
+        param($fixture)
+        $path = Join-Path $fixture 'LuaSource_云上同行\config\events.lua'
+        $content = [System.IO.File]::ReadAllText($path, $utf8).Replace('CORE_READY =', "[`"EXTRA`"] = true,`n    CORE_READY =")
+        Write-Utf8File -Path $path -Content $content
+    }
+}
+
+Assert-Pass 'hardening synthetic API evidence requires adjacent annotations' {
+    $fixture = New-FoundationFixture
+    try {
+        $apiPath = Join-Path $fixture 'SyntheticEggyAPI.lua'
+        $apiText = @'
+LuaAPI = {}
+EVENT = {}
+EVENT.GAME_INIT = 1
+EVENT.GAME_END = 2
+
+---@param _event_desc any[]
+---@param _callback function
+---@return integer
+function LuaAPI.unrelated_register(_event_desc, _callback) end
+
+---@param _id integer
+function LuaAPI.unrelated_unregister(_id) end
+
+---@param _content string
+---@param _log_level integer?
+function LuaAPI.unrelated_log(_content, _log_level) end
+
+---@param wrong string
+function LuaAPI.global_register_trigger_event(_event_desc, _callback) end
+
+---@param wrong string
+function LuaAPI.global_unregister_trigger_event(_id) end
+
+---@param wrong string
+function LuaAPI.log(_content, _log_level) end
+'@
+        Write-Utf8File -Path $apiPath -Content ($apiText + "`n")
+        $result = Invoke-FoundationVerifier -Root $fixture -ApiPath $apiPath
+        if ($result.ExitCode -eq 0) {
+            throw 'Verifier accepted detached API annotations.'
+        }
+        if ($result.Output -notmatch '\[api-export\]') {
+            throw "Expected diagnostic '[api-export]'. Output: $($result.Output)"
+        }
+    } finally {
+        Remove-FoundationFixture -Path $fixture
+    }
+}
+
+Assert-Pass 'hardening temp root cleanup is rejected without deletion' {
+    $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
+    Assert-CleanupRejected -Path $tempRoot
+}
+
+Assert-Pass 'hardening unexpected temp child cleanup is rejected without deletion' {
+    $unexpected = Join-Path ([System.IO.Path]::GetTempPath()) ('eggy-foundation-invalid-' + [System.Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $unexpected | Out-Null
+    try {
+        Assert-CleanupRejected -Path $unexpected
+    } finally {
+        if (Test-Path -LiteralPath $unexpected -PathType Container) {
+            Remove-Item -LiteralPath $unexpected -Force
+        }
     }
 }
 

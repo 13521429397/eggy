@@ -10,6 +10,8 @@ $rootPath = (Resolve-Path -LiteralPath $Root).Path
 $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
 $failures = [System.Collections.Generic.List[string]]::new()
 $luaLexicalPattern = '(?ms)--\[(?<commentEquals>=*)\[.*?\]\k<commentEquals>\]|--[^\r\n]*|"(?:\\.|[^"\\])*"|''(?:\\.|[^''\\])*''|\[(?<stringEquals>=*)\[.*?\]\k<stringEquals>\]'
+$canonicalRequireTarget = '[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*'
+$literalRequirePattern = '\brequire\s*(?:\(\s*["''](' + $canonicalRequireTarget + ')["'']\s*\)|["''](' + $canonicalRequireTarget + ')["''])'
 if ([string]::IsNullOrWhiteSpace($EggyApiPath)) {
     $EggyApiPath = Join-Path $rootPath 'LuaSource_云上同行\EggyAPI.lua'
 }
@@ -71,6 +73,36 @@ function Get-LuaRequireView {
     return [regex]::Replace($Text, $luaLexicalPattern, $evaluator)
 }
 
+function Get-LuaApiDeclarationEvidence {
+    param(
+        [string]$Text,
+        [string]$FunctionName
+    )
+
+    $declarationPattern = '(?m)^function[ \t]+LuaAPI\.' + [regex]::Escape($FunctionName) + '[ \t]*\([^\r\n]*\)[ \t]+end[ \t]*(?=\r?$)'
+    $declarations = [regex]::Matches($Text, $declarationPattern)
+    if ($declarations.Count -ne 1) {
+        Add-Failure -Category 'api-export' -Message "Current export must contain exactly one LuaAPI.$FunctionName declaration"
+        return $null
+    }
+
+    $declaration = $declarations[0]
+    $prefix = $Text.Substring(0, $declaration.Index)
+    $blockMatch = [regex]::Match($prefix, '(?m)(?<block>(?:^---[^\r\n]*\r?\n)+)\z')
+    if (-not $blockMatch.Success) {
+        Add-Failure -Category 'api-export' -Message "LuaAPI.$FunctionName is missing an adjacent Emmy annotation block"
+        return $null
+    }
+
+    $annotationLines = @([regex]::Matches($blockMatch.Groups['block'].Value, '(?m)^---@[^\r\n]*(?=\r?$)') | ForEach-Object {
+        $_.Value
+    })
+    return [pscustomobject]@{
+        Declaration = $declaration.Value
+        Annotations = $annotationLines
+    }
+}
+
 $requiredFiles = @(
     'LuaSource_云上同行/main.lua',
     'LuaSource_云上同行/adapters/u5_log.lua',
@@ -90,6 +122,8 @@ foreach ($relativePath in $requiredFiles) {
 }
 
 $runtimeRoot = Join-Path $rootPath 'LuaSource_云上同行'
+$runtimeRootFull = [System.IO.Path]::GetFullPath($runtimeRoot).TrimEnd([char[]]@('\', '/'))
+$runtimeRootPrefix = $runtimeRootFull + [System.IO.Path]::DirectorySeparatorChar
 $luaFiles = @()
 if (Test-Path -LiteralPath $runtimeRoot -PathType Container) {
     $generatedLuaEvidence = @(
@@ -139,7 +173,7 @@ foreach ($file in $luaFiles) {
     $allRequireCalls = [regex]::Matches($codeOnly, '\brequire\b')
     $literalRequires = [regex]::Matches(
         $requireView,
-        '\brequire\s*(?:\(\s*["'']([A-Za-z0-9_.]+)["'']\s*\)|["'']([A-Za-z0-9_.]+)["''])'
+        $literalRequirePattern
     )
     if ($allRequireCalls.Count -ne $literalRequires.Count) {
         Add-Failure -Category 'require-target' -Message "$relativePath contains a computed or malformed require"
@@ -149,7 +183,11 @@ foreach ($file in $luaFiles) {
         if ($target -eq '') {
             $target = $requireMatch.Groups[2].Value
         }
-        $targetPath = Join-Path $runtimeRoot ($target.Replace('.', '\') + '.lua')
+        $targetPath = [System.IO.Path]::GetFullPath((Join-Path $runtimeRootFull ($target.Replace('.', '\') + '.lua')))
+        if (-not $targetPath.StartsWith($runtimeRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Add-Failure -Category 'require-target' -Message "$relativePath escapes the runtime root: $target"
+            continue
+        }
         if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
             Add-Failure -Category 'require-target' -Message "$relativePath -> $target"
         }
@@ -200,12 +238,12 @@ $eventsPath = Join-Path $runtimeRoot 'config\events.lua'
 $definedEventKeys = @{}
 if (Test-Path -LiteralPath $eventsPath -PathType Leaf) {
     $eventsCode = Replace-LuaLexicalTokens -Text (Read-Utf8File -Path $eventsPath) -RemoveStrings $false
-    $eventDefinitions = [regex]::Matches($eventsCode, '([A-Z][A-Z0-9_]*)\s*=\s*"(CLOUD_JOURNEY\.[A-Z0-9_.]+)"')
-    foreach ($definition in $eventDefinitions) {
-        $definedEventKeys[$definition.Groups[1].Value] = $definition.Groups[2].Value
-    }
-    if ($definedEventKeys.Count -ne 1 -or $definedEventKeys['CORE_READY'] -ne 'CLOUD_JOURNEY.CORE_READY') {
+    $normalizedEventsCode = [regex]::Replace($eventsCode, '\s+', '')
+    $expectedEventsCode = 'localevents={CORE_READY="CLOUD_JOURNEY.CORE_READY",}returnevents'
+    if ($normalizedEventsCode -cne $expectedEventsCode) {
         Add-Failure -Category 'event-centralization' -Message 'config/events.lua must define only CORE_READY'
+    } else {
+        $definedEventKeys['CORE_READY'] = 'CLOUD_JOURNEY.CORE_READY'
     }
 }
 
@@ -250,30 +288,67 @@ if ([string]::IsNullOrWhiteSpace($EggyApiPath) -or -not (Test-Path -LiteralPath 
             Add-Failure -Category 'api-export' -Message "Current export is missing $symbol"
         }
     }
-    foreach ($signature in @(
-        '---@param _event_desc any\[\]',
-        '---@param _callback function',
-        '---@return integer',
-        'function LuaAPI\.global_register_trigger_event\(_event_desc, _callback\)',
-        '---@param _id integer',
-        'function LuaAPI\.global_unregister_trigger_event\(_id\)',
-        '---@param _content string',
-        '---@param _log_level integer\?',
-        'function LuaAPI\.log\(_content, _log_level\)'
-    )) {
-        if ($apiText -notmatch $signature) {
-            Add-Failure -Category 'api-export' -Message "Current export does not match signature evidence: $signature"
+    $apiSpecs = @(
+        @{
+            Name = 'global_register_trigger_event'
+            DeclarationPattern = '^function LuaAPI\.global_register_trigger_event\(_event_desc, _callback\) end$'
+            AnnotationPatterns = @(
+                '^---@param _event_desc any\[\](?:[ \t].*)?$',
+                '^---@param _callback function(?:[ \t].*)?$',
+                '^---@return integer(?:[ \t].*)?$'
+            )
+        },
+        @{
+            Name = 'global_unregister_trigger_event'
+            DeclarationPattern = '^function LuaAPI\.global_unregister_trigger_event\(_id\) end$'
+            AnnotationPatterns = @(
+                '^---@param _id integer(?:[ \t].*)?$'
+            )
+        },
+        @{
+            Name = 'log'
+            DeclarationPattern = '^function LuaAPI\.log\(_content, _log_level\) end$'
+            AnnotationPatterns = @(
+                '^---@param _content string(?:[ \t].*)?$',
+                '^---@param _log_level integer\?(?:[ \t].*)?$'
+            )
+        }
+    )
+    foreach ($spec in $apiSpecs) {
+        $evidence = Get-LuaApiDeclarationEvidence -Text $apiText -FunctionName $spec.Name
+        if ($null -eq $evidence) {
+            continue
+        }
+        if ($evidence.Declaration -notmatch $spec.DeclarationPattern) {
+            Add-Failure -Category 'api-export' -Message "LuaAPI.$($spec.Name) declaration does not match current signature evidence"
+        }
+        if ($evidence.Annotations.Count -ne $spec.AnnotationPatterns.Count) {
+            Add-Failure -Category 'api-export' -Message "LuaAPI.$($spec.Name) has an unexpected annotation count"
+            continue
+        }
+        for ($index = 0; $index -lt $spec.AnnotationPatterns.Count; $index += 1) {
+            if ($evidence.Annotations[$index] -notmatch $spec.AnnotationPatterns[$index]) {
+                Add-Failure -Category 'api-export' -Message "LuaAPI.$($spec.Name) annotation $($index + 1) does not match current signature evidence"
+            }
         }
     }
 }
 
 if (Test-Path -LiteralPath (Join-Path $rootPath '.git') -PathType Container) {
-    $unstagedWhitespace = & git -C $rootPath diff --check -- 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $unstagedWhitespace = & git -C $rootPath diff --check -- 2>&1
+        $unstagedExitCode = $LASTEXITCODE
+        $stagedWhitespace = & git -C $rootPath diff --cached --check -- 2>&1
+        $stagedExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($unstagedExitCode -ne 0) {
         Add-Failure -Category 'whitespace' -Message ($unstagedWhitespace -join '; ')
     }
-    $stagedWhitespace = & git -C $rootPath diff --cached --check -- 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    if ($stagedExitCode -ne 0) {
         Add-Failure -Category 'whitespace' -Message ($stagedWhitespace -join '; ')
     }
 }

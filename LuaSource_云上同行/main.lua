@@ -215,6 +215,10 @@ function app.dispose()
         game_init_received = false
         return true
     end
+    -- 初始化是原子阶段，公开清理必须等待本轮完成。
+    if state == STATE.INITIALIZING then
+        return false
+    end
     if state == STATE.DISPOSED then
         return true
     end

@@ -310,6 +310,27 @@ test.test("main rejects reentrant initialization and cleanup calls", function()
     test.falsy(reentrant_dispose_result)
 end)
 
+test.test("main rejects public disposal during dependency initialization", function()
+    local options = {}
+    local app, evidence = load_app(options)
+    local initializing_dispose_result = nil
+
+    test.truthy(app.dispose())
+    options.u5_log_init_hook = function()
+        initializing_dispose_result = app.dispose()
+    end
+    test.truthy(app.init())
+    test.falsy(initializing_dispose_result)
+    options.u5_log_init_hook = nil
+
+    evidence.callbacks.game_init()
+    test.equal(evidence.start_calls, 1)
+    test.truthy(app.dispose())
+    test.truthy(app.init())
+    evidence.callbacks.game_init()
+    test.equal(evidence.start_calls, 2)
+end)
+
 for _, module_name in ipairs(module_names) do
     package.preload[module_name] = nil
     package.loaded[module_name] = nil

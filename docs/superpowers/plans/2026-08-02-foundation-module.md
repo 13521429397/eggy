@@ -4,9 +4,9 @@
 
 **Goal:** Build the smallest reusable, lifecycle-safe Lua foundation for Cloud Journey using only the five platform surfaces documented by the current NetEase Workshop Manual and reconciled with the current Eggitor export.
 
-**Architecture:** Keep `script/main.lua` limited to assembly, place all direct U5 calls in two adapters, and keep logging, event dispatch, object lookup, and foundation state platform-independent. Each singleton module validates inputs before mutation, supports completed dispose/reinitialize cycles, and exposes explicit failure results; static PowerShell verification runs without external dependencies while Lua behavior and editor integration remain separately reported evidence.
+**Architecture:** Keep `LuaSource_云上同行/main.lua` limited to assembly, place all direct U5 calls in two adapters, and keep logging, event dispatch, object lookup, and foundation state platform-independent. Each singleton module validates inputs before mutation, supports completed dispose/reinitialize cycles, and exposes explicit failure results; static PowerShell verification runs without external dependencies while Lua behavior and editor integration remain separately reported evidence.
 
-**Tech Stack:** Eggy Party PC Editor, Eggitor, the Eggy Lua 5.4 sandbox, Lua modules under `script/`, Windows PowerShell 5.1, Git, and GitHub `origin/main`.
+**Tech Stack:** Eggy Party PC Editor, Eggitor, the Eggy Lua 5.4 sandbox, Lua modules under the physical `LuaSource_云上同行/` project root mapped to the logical `script/` namespace, Windows PowerShell 5.1, Git, and GitHub `origin/main`.
 
 ---
 
@@ -20,7 +20,7 @@ Implement against the approved design in `docs/superpowers/specs/2026-08-02-foun
 - [API guide](https://u5.gsf.netease.com/eggy_manual_3068736/pc_md/lua/lua_api_structure.html)
 - [Current API manual](https://u5.gsf.netease.com/eggy_manual_3068736/pc_md/lua/EggyAPI.html)
 
-The manual establishes that these capabilities are supported: `LuaAPI.log`, `LuaAPI.global_register_trigger_event`, `LuaAPI.global_unregister_trigger_event`, `EVENT.GAME_INIT`, and `EVENT.GAME_END`. The local export gate below confirms the installed editor version's exact evidence; it does not reopen whether the documented capabilities are feasible.
+The manual establishes that these capabilities are supported: `LuaAPI.log`, `LuaAPI.global_register_trigger_event`, `LuaAPI.global_unregister_trigger_event`, `EVENT.GAME_INIT`, and `EVENT.GAME_END`. The current Eggitor 0.3.9 export confirms `global_register_trigger_event(any[], callback) -> integer`, `global_unregister_trigger_event(integer)`, `log(string, optional integer level)`, `GAME_INIT`, and `GAME_END`. The foundation uses the supported one-argument `log(string)` form. The physical `LuaSource_云上同行/` root is the connected counterpart of the platform's logical `script/` namespace; runtime `require` strings remain root-relative and never contain either root name.
 
 Do not add pair sessions, players, checkpoints, respawn, hints, UI, lighting, camera, archives, chapter logic, timers, Tick handlers, real editor IDs, or any platform surface beyond those five.
 
@@ -30,15 +30,15 @@ Create these production files:
 
 | Path | Responsibility |
 | --- | --- |
-| `script/main.lua` | Assemble modules, own application lifecycle, register game start/end callbacks |
-| `script/adapters/u5_log.lua` | Own the only direct `LuaAPI.log` call |
-| `script/adapters/u5_event.lua` | Own the only `EVENT` and global trigger registration calls |
-| `script/core/logger.lua` | Normalize protected logging independent of U5 |
-| `script/core/event_bus.lua` | Dispatch synchronous internal events from a stable snapshot |
-| `script/core/object_registry.lua` | Resolve verified logical keys without querying the editor |
-| `script/core/game_flow.lua` | Hold the foundation lifecycle state only |
-| `script/config/events.lua` | Define the sole internal event name |
-| `script/config/objects.lua` | Return an empty mapping until real Eggitor data exists |
+| `LuaSource_云上同行/main.lua` | Assemble modules, own application lifecycle, register game start/end callbacks |
+| `LuaSource_云上同行/adapters/u5_log.lua` | Own the only direct `LuaAPI.log` call |
+| `LuaSource_云上同行/adapters/u5_event.lua` | Own the only `EVENT` and global trigger registration calls |
+| `LuaSource_云上同行/core/logger.lua` | Normalize protected logging independent of U5 |
+| `LuaSource_云上同行/core/event_bus.lua` | Dispatch synchronous internal events from a stable snapshot |
+| `LuaSource_云上同行/core/object_registry.lua` | Resolve verified logical keys without querying the editor |
+| `LuaSource_云上同行/core/game_flow.lua` | Hold the foundation lifecycle state only |
+| `LuaSource_云上同行/config/events.lua` | Define the sole internal event name |
+| `LuaSource_云上同行/config/objects.lua` | Return an empty mapping until real Eggitor data exists |
 
 Create these verification files:
 
@@ -72,15 +72,16 @@ The `tests/lua/` suite may use desktop-only `package` facilities because it is n
 
 Every modifying task supplies its complete `git add` and non-interactive Lore commit command. Before running that task-specific block, start with `git status --short --branch`; never use `git add .`, `git add -A`, or `git commit -a`. Every block inspects the cached name-status, full cached diff, and whitespace before committing, pushes immediately to `origin/main`, and verifies that the remote SHA equals local `HEAD`. Each push checks its exit code. On rejection, fetch `origin`, print `HEAD...origin/main` with left/right markers, preserve the local commit, and stop for safe reconciliation; never retry with force.
 
-### Task 0: Pass the Eggitor and API-export prerequisite gate
+### Task 0: Record the completed Eggitor and API-export prerequisite gate
 
 **Files:**
-- Inspect: current Eggitor-generated Lua project rooted at `D:\eggy`
+- Inspect: current Eggitor-generated Lua project rooted at `D:\eggy\LuaSource_云上同行`
 - Inspect: current `EggyAPI.lua` exported to `%LOCALAPPDATA%\EggyCloudJourney\evidence\EggyAPI.lua`
-- Inspect: `script/main.lua`
+- Inspect: `LuaSource_云上同行/eggy.json`
+- Inspect: `LuaSource_云上同行/main.lua`
 - Do not stage generated or exported evidence in this task
 
-- [ ] **Step 1: Confirm the Git baseline is clean and synchronized**
+- [x] **Step 1: Confirm the Git baseline is clean and synchronized**
 
 Run:
 
@@ -92,15 +93,15 @@ git rev-parse HEAD
 git rev-parse origin/main
 ```
 
-Expected: branch `main`, no changed paths, and identical local/remote SHAs. If the remote moved, inspect and reconcile without force-pushing before continuing.
+Recorded evidence: branch `main`; local and remote both resolved to `8fbf7b5ba6550999f1e4d89dcf4a541fba013c0f` before layout classification. The connected generated root was the only untracked path.
 
-- [ ] **Step 2: Generate and connect the real Lua project through Eggitor**
+- [x] **Step 2: Generate and connect the real Lua project through Eggitor**
 
-In the PC editor, open `Plugins -> Eggy Developer Assistant`, generate/open the Lua project at `D:\eggy`, connect the VS Code extension, and wait for Eggitor to report the connected state. Do not hand-create an imitation project.
+In the PC editor, Eggitor 0.3.9 generated and connected `D:\eggy\LuaSource_云上同行` without moving or renaming it. VS Code and the editor completed full synchronization on port `11704`.
 
-Expected: Eggitor reports the editor and VS Code sides as connected, and `D:\eggy\script\main.lua` exists. If generation produces paths outside the file map above, stop and classify them before staging anything; never delete or commit unknown generated files by assumption.
+Recorded evidence: `LuaSource_云上同行/eggy.json` identifies project ID `6a6f8536abc0fca321ab1fd3`, and `LuaSource_云上同行/main.lua` is the untouched starter with no gameplay. This generated directory is the physical project root; do not create a nested physical `script` directory.
 
-- [ ] **Step 3: Export the installed editor's API evidence outside the repository**
+- [x] **Step 3: Export the installed editor's API evidence outside the repository**
 
 Run first:
 
@@ -115,7 +116,7 @@ In the VS Code Eggy Developer Assistant panel, use `Export API` and select the p
 
 Expected: `%LOCALAPPDATA%\EggyCloudJourney\evidence\EggyAPI.lua` exists and is the export from the currently connected editor/map session.
 
-- [ ] **Step 4: Reconcile the five documented surfaces with the export**
+- [x] **Step 4: Reconcile the five documented surfaces with the export**
 
 Run:
 
@@ -140,6 +141,23 @@ foreach ($symbol in $requiredApiEvidence) {
     }
 }
 
+$requiredApiSignatures = @(
+    '---@param _event_desc any\[\]',
+    '---@param _callback function',
+    '---@return integer',
+    'function LuaAPI\.global_register_trigger_event\(_event_desc, _callback\)',
+    '---@param _id integer',
+    'function LuaAPI\.global_unregister_trigger_event\(_id\)',
+    '---@param _content string',
+    '---@param _log_level integer\?',
+    'function LuaAPI\.log\(_content, _log_level\)'
+)
+foreach ($signature in $requiredApiSignatures) {
+    if ($apiText -notmatch $signature) {
+        throw "Current EggyAPI.lua does not match required signature evidence: $signature"
+    }
+}
+
 Select-String -LiteralPath $apiEvidencePath -Pattern @(
     'LuaAPI\.log',
     'LuaAPI\.global_register_trigger_event',
@@ -149,31 +167,57 @@ Select-String -LiteralPath $apiEvidencePath -Pattern @(
 ) -Context 2,4
 ```
 
-Expected: all five names are present. Confirm that registration takes an event-description list and callback and returns an integer registration ID; confirm unregistration takes that ID; confirm log takes one string. If the installed export conflicts with those documented signatures, stop before Task 1 and report the exact conflict. Do not add a marker that would make the verifier green while the conflict remains.
+Recorded evidence: all five names are present. Registration takes an event-description list and callback and returns an integer registration ID; unregistration takes that ID; logging takes a string and an optional integer level. The foundation intentionally calls logging with only the required string argument. If a later installed export conflicts with these signatures, stop before implementation and report the exact conflict.
 
-- [ ] **Step 5: Confirm the generated entry point is safe to replace**
+- [x] **Step 5: Confirm the generated entry point is safe to replace**
 
 Run:
 
 ```powershell
-Get-Content -Raw -Encoding UTF8 D:\eggy\script\main.lua
+Get-Content -Raw -Encoding UTF8 D:\eggy\LuaSource_云上同行\main.lua
 git status --short
 ```
 
-Expected: `script/main.lua` is empty or contains only the untouched Eggitor starter template. If it contains user gameplay, preserve it and revise the approved design before replacement. This prerequisite task creates no Git commit.
+Recorded evidence: `LuaSource_云上同行/main.lua` contains only the untouched Eggitor starter template. It remains unchanged until Task 7 replaces it with the approved assembly entry point.
+
+### Task 0.5: Classify and commit the live connected-project layout
+
+**Files:**
+- Modify: `.gitignore`
+- Modify: `AGENTS.md`
+- Modify: `docs/superpowers/plans/2026-08-02-foundation-module.md`
+- Modify: `docs/superpowers/specs/2026-08-02-foundation-module-design.md`
+- Add unchanged generated metadata: `LuaSource_云上同行/eggy.json`
+- Add unchanged starter: `LuaSource_云上同行/main.lua`
+
+- [x] **Step 1: Preserve the generated root and classify the mapping**
+
+Keep `LuaSource_云上同行/` in place as the sole physical project root. It maps to the manual's logical `script/` namespace, so production files are created directly beneath it and imports remain root-relative, for example `require("core.logger")`.
+
+- [x] **Step 2: Ignore only connected-project local/generated artifacts**
+
+Ignore `.vscode/`, `.codemaker/`, `EggyAPI.lua`, `EggyEditorAPI.lua`, and `DebugTools.lua` beneath `LuaSource_云上同行/`. Keep `eggy.json`, `main.lua`, and all project-owned modules eligible for version control.
+
+- [x] **Step 3: Lock the nested-require synchronization gate**
+
+Task 9 temporarily creates `LuaSource_云上同行/tests/foundation_editor_harness.lua`, waits for synchronization, executes `require("tests.foundation_editor_harness")` in the editor, records the playtest evidence, deletes the harness, and waits for deletion synchronization. Any future root move, rename, or regeneration must repeat connection, full-sync, entry-point, and nested-require validation.
+
+- [x] **Step 4: Commit and push the classified shell**
+
+Stage exactly `.gitignore`, `AGENTS.md`, the plan, the design, `LuaSource_云上同行/eggy.json`, and the untouched `LuaSource_云上同行/main.lua`. Generated API/debug files and local folders remain ignored. Run `git diff --check` across the edited project-owned text and a path-scoped `git diff --cached --check` that excludes only `LuaSource_云上同行/eggy.json`; preserve that generator-owned file byte-for-byte, verify its SHA-256 is `6E6B8D99D60642F9D647BDA89833B07C45F5E9BE35493E356BEF98D2FEE40EF7`, and inspect the full staged diff including the generated formatting. Commit with the Task 0.5 Lore record and push directly to `origin/main` before Task 1.
 
 ### Task 1: Add central foundation configuration
 
 **Files:**
-- Create: `script/config/events.lua`
-- Create: `script/config/objects.lua`
+- Create: `LuaSource_云上同行/config/events.lua`
+- Create: `LuaSource_云上同行/config/objects.lua`
 
 - [ ] **Step 1: Run the configuration RED check**
 
 Run:
 
 ```powershell
-$missing = @('script/config/events.lua', 'script/config/objects.lua') | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) }
+$missing = @('LuaSource_云上同行/config/events.lua', 'LuaSource_云上同行/config/objects.lua') | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) }
 if ($missing.Count -ne 0) { throw "Missing foundation config: $($missing -join ', ')" }
 ```
 
@@ -181,7 +225,7 @@ Expected: FAIL and name both missing files.
 
 - [ ] **Step 2: Create the exact event configuration**
 
-Create `script/config/events.lua`:
+Create `LuaSource_云上同行/config/events.lua`:
 
 ```lua
 -- 项目自定义事件只在此处登记，避免业务模块散落事件字符串。
@@ -194,7 +238,7 @@ return events
 
 - [ ] **Step 3: Create the exact empty object configuration**
 
-Create `script/config/objects.lua`:
+Create `LuaSource_云上同行/config/objects.lua`:
 
 ```lua
 -- 基础模块不绑定编辑器对象；真实 ID 必须来自当前地图的 Eggitor 导出。
@@ -206,13 +250,13 @@ return {}
 Run:
 
 ```powershell
-$events = Get-Content -Raw -Encoding UTF8 script\config\events.lua
-$objects = Get-Content -Raw -Encoding UTF8 script\config\objects.lua
+$events = Get-Content -Raw -Encoding UTF8 LuaSource_云上同行\config\events.lua
+$objects = Get-Content -Raw -Encoding UTF8 LuaSource_云上同行\config\objects.lua
 if ($events -notmatch 'CORE_READY\s*=\s*"CLOUD_JOURNEY\.CORE_READY"') { throw 'CORE_READY is not centralized correctly.' }
 $objectsCode = [regex]::Replace($objects, '(?m)^\s*--[^\r\n]*', '')
 $objectsCode = [regex]::Replace($objectsCode, '\s+', '')
 if ($objectsCode -ne 'return{}') { throw 'objects.lua must remain empty in the foundation module.' }
-git diff --check -- script/config/events.lua script/config/objects.lua
+git diff --check -- LuaSource_云上同行/config/events.lua LuaSource_云上同行/config/objects.lua
 ```
 
 Expected: exit `0` and no Git whitespace output.
@@ -223,7 +267,7 @@ Run:
 
 ```powershell
 git status --short --branch
-git add -- script/config/events.lua script/config/objects.lua
+git add -- LuaSource_云上同行/config/events.lua LuaSource_云上同行/config/objects.lua
 git diff --cached --name-status
 git diff --cached
 git diff --cached --check
@@ -258,7 +302,7 @@ Expected: the commit contains only the two configuration files and `origin/main`
 **Files:**
 - Create: `tests/lua/test_helper.lua`
 - Create: `tests/lua/core/event_bus_test.lua`
-- Create: `script/core/event_bus.lua`
+- Create: `LuaSource_云上同行/core/event_bus.lua`
 
 - [ ] **Step 1: Create the exact dependency-free Lua test helper**
 
@@ -328,7 +372,7 @@ return helper
 Create `tests/lua/core/event_bus_test.lua`:
 
 ```lua
-package.path = "tests/lua/?.lua;script/?.lua;" .. package.path
+package.path = "tests/lua/?.lua;LuaSource_云上同行/?.lua;" .. package.path
 
 local test = require("test_helper")
 
@@ -451,7 +495,7 @@ Expected: FAIL because `core.event_bus` is absent when a Lua 5.4 runner exists, 
 
 - [ ] **Step 4: Implement the exact event bus**
 
-Create `script/core/event_bus.lua`:
+Create `LuaSource_云上同行/core/event_bus.lua`:
 
 ```lua
 local event_bus = {}
@@ -586,13 +630,13 @@ return event_bus
 Run the Step 3 command again, then run:
 
 ```powershell
-$source = Get-Content -Raw -Encoding UTF8 script\core\event_bus.lua
+$source = Get-Content -Raw -Encoding UTF8 LuaSource_云上同行\core\event_bus.lua
 foreach ($surface in @('init', 'subscribe', 'unsubscribe', 'publish', 'dispose')) {
     if ($source -notmatch "function event_bus\.$surface") { throw "Missing event_bus.$surface" }
 }
 if ($source -notmatch 'pcall\(subscription\.handler, payload\)') { throw 'Handlers are not protected.' }
 if ($source -match '\bLuaAPI\b|\bEVENT\b') { throw 'event_bus must remain platform-independent.' }
-git diff --check -- tests/lua/test_helper.lua tests/lua/core/event_bus_test.lua script/core/event_bus.lua
+git diff --check -- tests/lua/test_helper.lua tests/lua/core/event_bus_test.lua LuaSource_云上同行/core/event_bus.lua
 ```
 
 Expected: source checks exit `0`; Lua result is PASS or explicitly `[NOT-RUN]`.
@@ -603,7 +647,7 @@ Run:
 
 ```powershell
 git status --short --branch
-git add -- tests/lua/test_helper.lua tests/lua/core/event_bus_test.lua script/core/event_bus.lua
+git add -- tests/lua/test_helper.lua tests/lua/core/event_bus_test.lua LuaSource_云上同行/core/event_bus.lua
 git diff --cached --name-status
 git diff --cached
 git diff --cached --check
@@ -637,14 +681,14 @@ Expected: the commit contains only the test helper, event-bus test, and event-bu
 
 **Files:**
 - Create: `tests/lua/core/object_registry_test.lua`
-- Create: `script/core/object_registry.lua`
+- Create: `LuaSource_云上同行/core/object_registry.lua`
 
 - [ ] **Step 1: Write the object-registry behavior tests**
 
 Create `tests/lua/core/object_registry_test.lua`:
 
 ```lua
-package.path = "tests/lua/?.lua;script/?.lua;" .. package.path
+package.path = "tests/lua/?.lua;LuaSource_云上同行/?.lua;" .. package.path
 
 local test = require("test_helper")
 
@@ -748,7 +792,7 @@ Expected: FAIL because the module is absent under Lua 5.4, otherwise explicit `[
 
 - [ ] **Step 3: Implement the exact object registry**
 
-Create `script/core/object_registry.lua`:
+Create `LuaSource_云上同行/core/object_registry.lua`:
 
 ```lua
 local object_registry = {}
@@ -854,13 +898,13 @@ return object_registry
 Run the Step 2 command again, then:
 
 ```powershell
-$source = Get-Content -Raw -Encoding UTF8 script\core\object_registry.lua
+$source = Get-Content -Raw -Encoding UTF8 LuaSource_云上同行\core\object_registry.lua
 foreach ($surface in @('init', 'has', 'get', 'dispose')) {
     if ($source -notmatch "function object_registry\.$surface") { throw "Missing object_registry.$surface" }
 }
 if ($source -notmatch 'warned_missing_keys\[logical_key\] = true') { throw 'Missing-key warning suppression is absent.' }
 if ($source -match '\bLuaAPI\b|\bEVENT\b') { throw 'object_registry must remain platform-independent.' }
-git diff --check -- tests/lua/core/object_registry_test.lua script/core/object_registry.lua
+git diff --check -- tests/lua/core/object_registry_test.lua LuaSource_云上同行/core/object_registry.lua
 ```
 
 Expected: source checks exit `0`; Lua result is PASS or explicitly `[NOT-RUN]`.
@@ -871,7 +915,7 @@ Run:
 
 ```powershell
 git status --short --branch
-git add -- tests/lua/core/object_registry_test.lua script/core/object_registry.lua
+git add -- tests/lua/core/object_registry_test.lua LuaSource_云上同行/core/object_registry.lua
 git diff --cached --name-status
 git diff --cached
 git diff --cached --check
@@ -907,8 +951,8 @@ Expected: the commit contains only the object-registry test and module; local an
 - Inspect: `tests/lua/test_helper.lua`
 - Create: `tests/lua/adapters/u5_log_test.lua`
 - Create: `tests/lua/core/logger_test.lua`
-- Create: `script/adapters/u5_log.lua`
-- Create: `script/core/logger.lua`
+- Create: `LuaSource_云上同行/adapters/u5_log.lua`
+- Create: `LuaSource_云上同行/core/logger.lua`
 
 - [ ] **Step 1: Verify the shared Lua test helper is unchanged**
 
@@ -928,7 +972,7 @@ Expected: exit `0`; Task 4 does not rewrite shared test infrastructure.
 Create `tests/lua/adapters/u5_log_test.lua`:
 
 ```lua
-package.path = "tests/lua/?.lua;script/?.lua;" .. package.path
+package.path = "tests/lua/?.lua;LuaSource_云上同行/?.lua;" .. package.path
 
 local test = require("test_helper")
 
@@ -980,7 +1024,7 @@ test.run()
 Create `tests/lua/core/logger_test.lua`:
 
 ```lua
-package.path = "tests/lua/?.lua;script/?.lua;" .. package.path
+package.path = "tests/lua/?.lua;LuaSource_云上同行/?.lua;" .. package.path
 
 local test = require("test_helper")
 
@@ -1058,7 +1102,7 @@ Expected now: `[NOT-RUN]` with evidence code `2`, because no compatible runner i
 
 - [ ] **Step 5: Implement the exact U5 logging adapter**
 
-Create `script/adapters/u5_log.lua`:
+Create `LuaSource_云上同行/adapters/u5_log.lua`:
 
 ```lua
 local u5_log = {}
@@ -1108,7 +1152,7 @@ return u5_log
 
 - [ ] **Step 6: Implement the exact platform-independent logger**
 
-Create `script/core/logger.lua`:
+Create `LuaSource_云上同行/core/logger.lua`:
 
 ```lua
 local logger = {}
@@ -1177,13 +1221,13 @@ return logger
 Run the Lua command from Step 4 again. If no runner exists, retain `[NOT-RUN]` and then run:
 
 ```powershell
-$adapter = Get-Content -Raw -Encoding UTF8 script\adapters\u5_log.lua
-$logger = Get-Content -Raw -Encoding UTF8 script\core\logger.lua
+$adapter = Get-Content -Raw -Encoding UTF8 LuaSource_云上同行\adapters\u5_log.lua
+$logger = Get-Content -Raw -Encoding UTF8 LuaSource_云上同行\core\logger.lua
 if ($adapter -notmatch 'pcall\(platform_log, line\)') { throw 'u5_log must protect LuaAPI.log.' }
 if ($adapter.IndexOf('return "[" .. tostring(level)', [System.StringComparison]::Ordinal) -lt 0) { throw 'u5_log format is not explicit.' }
 if ($logger -match '\bLuaAPI\b|\bEVENT\b') { throw 'core.logger must remain platform-independent.' }
 if ($logger -notmatch 'function logger\.init' -or $logger -notmatch 'function logger\.dispose') { throw 'logger lifecycle is incomplete.' }
-git diff --check -- tests/lua/test_helper.lua tests/lua/adapters/u5_log_test.lua tests/lua/core/logger_test.lua script/adapters/u5_log.lua script/core/logger.lua
+git diff --check -- tests/lua/test_helper.lua tests/lua/adapters/u5_log_test.lua tests/lua/core/logger_test.lua LuaSource_云上同行/adapters/u5_log.lua LuaSource_云上同行/core/logger.lua
 ```
 
 Expected: source-contract checks exit `0`; Lua behavior is either PASS under compatible Lua 5.4 or explicitly `[NOT-RUN]`.
@@ -1194,7 +1238,7 @@ Run:
 
 ```powershell
 git status --short --branch
-git add -- tests/lua/adapters/u5_log_test.lua tests/lua/core/logger_test.lua script/adapters/u5_log.lua script/core/logger.lua
+git add -- tests/lua/adapters/u5_log_test.lua tests/lua/core/logger_test.lua LuaSource_云上同行/adapters/u5_log.lua LuaSource_云上同行/core/logger.lua
 git diff --cached --name-status
 git diff --cached
 git diff --cached --check
@@ -1228,14 +1272,14 @@ Expected: the commit contains only the two logging tests and two logging modules
 
 **Files:**
 - Create: `tests/lua/core/game_flow_test.lua`
-- Create: `script/core/game_flow.lua`
+- Create: `LuaSource_云上同行/core/game_flow.lua`
 
 - [ ] **Step 1: Write the game-flow behavior tests**
 
 Create `tests/lua/core/game_flow_test.lua`:
 
 ```lua
-package.path = "tests/lua/?.lua;script/?.lua;" .. package.path
+package.path = "tests/lua/?.lua;LuaSource_云上同行/?.lua;" .. package.path
 
 local test = require("test_helper")
 
@@ -1345,7 +1389,7 @@ Expected: FAIL because the module is absent under compatible Lua 5.4, otherwise 
 
 - [ ] **Step 3: Implement the exact game flow**
 
-Create `script/core/game_flow.lua`:
+Create `LuaSource_云上同行/core/game_flow.lua`:
 
 ```lua
 local game_flow = {}
@@ -1437,13 +1481,13 @@ return game_flow
 Run the Step 2 command again, then:
 
 ```powershell
-$source = Get-Content -Raw -Encoding UTF8 script\core\game_flow.lua
+$source = Get-Content -Raw -Encoding UTF8 LuaSource_云上同行\core\game_flow.lua
 foreach ($surface in @('init', 'start', 'get_state', 'dispose')) {
     if ($source -notmatch "function game_flow\.$surface") { throw "Missing game_flow.$surface" }
 }
 if ($source -match 'CLOUD_JOURNEY\.CORE_READY') { throw 'Custom event literal escaped config/events.lua.' }
 if ($source -match '\bLuaAPI\b|\bEVENT\b') { throw 'game_flow must remain platform-independent.' }
-git diff --check -- tests/lua/core/game_flow_test.lua script/core/game_flow.lua
+git diff --check -- tests/lua/core/game_flow_test.lua LuaSource_云上同行/core/game_flow.lua
 ```
 
 Expected: source checks exit `0`; Lua result is PASS or explicitly `[NOT-RUN]`.
@@ -1454,7 +1498,7 @@ Run:
 
 ```powershell
 git status --short --branch
-git add -- tests/lua/core/game_flow_test.lua script/core/game_flow.lua
+git add -- tests/lua/core/game_flow_test.lua LuaSource_云上同行/core/game_flow.lua
 git diff --cached --name-status
 git diff --cached
 git diff --cached --check
@@ -1488,14 +1532,14 @@ Expected: the commit contains only the game-flow test and module; local and remo
 
 **Files:**
 - Create: `tests/lua/adapters/u5_event_test.lua`
-- Create: `script/adapters/u5_event.lua`
+- Create: `LuaSource_云上同行/adapters/u5_event.lua`
 
 - [ ] **Step 1: Write the platform-event behavior tests**
 
 Create `tests/lua/adapters/u5_event_test.lua`:
 
 ```lua
-package.path = "tests/lua/?.lua;script/?.lua;" .. package.path
+package.path = "tests/lua/?.lua;LuaSource_云上同行/?.lua;" .. package.path
 
 local test = require("test_helper")
 
@@ -1656,7 +1700,7 @@ Expected: FAIL because the adapter is absent under compatible Lua 5.4, otherwise
 
 - [ ] **Step 3: Implement the exact U5 event adapter**
 
-Create `script/adapters/u5_event.lua`:
+Create `LuaSource_云上同行/adapters/u5_event.lua`:
 
 ```lua
 local u5_event = {}
@@ -1824,13 +1868,13 @@ return u5_event
 Run the Step 2 command again, then:
 
 ```powershell
-$source = Get-Content -Raw -Encoding UTF8 script\adapters\u5_event.lua
+$source = Get-Content -Raw -Encoding UTF8 LuaSource_云上同行\adapters\u5_event.lua
 foreach ($surface in @('init', 'on_game_init', 'on_game_end', 'unregister', 'dispose')) {
     if ($source -notmatch "function u5_event\.$surface") { throw "Missing u5_event.$surface" }
 }
 if ($source -notmatch 'pcall\(register_trigger, \{ event_value \}, callback\)') { throw 'Registration signature does not match the documented event list.' }
 if ($source -notmatch 'pcall\(unregister_trigger, handle\)') { throw 'Unregistration is not protected.' }
-git diff --check -- tests/lua/adapters/u5_event_test.lua script/adapters/u5_event.lua
+git diff --check -- tests/lua/adapters/u5_event_test.lua LuaSource_云上同行/adapters/u5_event.lua
 ```
 
 Expected: source checks exit `0`; Lua result is PASS or explicitly `[NOT-RUN]`.
@@ -1841,7 +1885,7 @@ Run:
 
 ```powershell
 git status --short --branch
-git add -- tests/lua/adapters/u5_event_test.lua script/adapters/u5_event.lua
+git add -- tests/lua/adapters/u5_event_test.lua LuaSource_云上同行/adapters/u5_event.lua
 git diff --cached --name-status
 git diff --cached
 git diff --cached --check
@@ -1875,14 +1919,14 @@ Expected: the commit contains only the U5 event-adapter test and module; local a
 
 **Files:**
 - Create: `tests/lua/main_test.lua`
-- Replace: `script/main.lua`
+- Replace: `LuaSource_云上同行/main.lua`
 
 - [ ] **Step 1: Write the application assembly tests**
 
 Create `tests/lua/main_test.lua`:
 
 ```lua
-package.path = "tests/lua/?.lua;script/?.lua;" .. package.path
+package.path = "tests/lua/?.lua;LuaSource_云上同行/?.lua;" .. package.path
 
 local test = require("test_helper")
 
@@ -2093,7 +2137,7 @@ Expected: FAIL against the untouched Eggitor entry point under compatible Lua 5.
 
 - [ ] **Step 3: Replace the entry point with the exact application assembly**
 
-Replace `script/main.lua` with:
+Replace `LuaSource_云上同行/main.lua` with:
 
 ```lua
 local u5_log = require("adapters.u5_log")
@@ -2271,7 +2315,7 @@ return app
 Run the Step 2 command again, then:
 
 ```powershell
-$source = Get-Content -Raw -Encoding UTF8 script\main.lua
+$source = Get-Content -Raw -Encoding UTF8 LuaSource_云上同行\main.lua
 if ([regex]::Matches($source, 'local load_init_succeeded = app\.init\(\)').Count -ne 1) { throw 'main.lua must call app.init exactly once during load.' }
 if ($source -match '\bLuaAPI\b|\bEVENT\b') { throw 'main.lua must not access platform globals.' }
 $requiredOrder = @('u5_log.init', 'logger.init', 'event_bus.init', 'object_registry.init', 'game_flow.init', 'u5_event.init', 'u5_event.on_game_init', 'u5_event.on_game_end')
@@ -2281,7 +2325,7 @@ foreach ($token in $requiredOrder) {
     if ($index -le $lastIndex) { throw "Initialization order is wrong at $token" }
     $lastIndex = $index
 }
-git diff --check -- tests/lua/main_test.lua script/main.lua
+git diff --check -- tests/lua/main_test.lua LuaSource_云上同行/main.lua
 ```
 
 Expected: source checks exit `0`; Lua result is PASS or explicitly `[NOT-RUN]`.
@@ -2292,7 +2336,7 @@ Run:
 
 ```powershell
 git status --short --branch
-git add -- tests/lua/main_test.lua script/main.lua
+git add -- tests/lua/main_test.lua LuaSource_云上同行/main.lua
 git diff --cached --name-status
 git diff --cached
 git diff --cached --check
@@ -2334,7 +2378,7 @@ Create `tests/static/verify-foundation.tests.ps1`:
 
 ```powershell
 param(
-    [string]$EggyApiPath = (Join-Path $env:LOCALAPPDATA 'EggyCloudJourney\evidence\EggyAPI.lua')
+    [string]$EggyApiPath
 )
 
 Set-StrictMode -Version Latest
@@ -2344,6 +2388,9 @@ $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $verifierPath = Join-Path $repoRoot 'tools\verify-foundation.ps1'
 $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
 $failures = [System.Collections.Generic.List[string]]::new()
+if ([string]::IsNullOrWhiteSpace($EggyApiPath)) {
+    $EggyApiPath = Join-Path $repoRoot 'LuaSource_云上同行\EggyAPI.lua'
+}
 
 function Write-Utf8File {
     param([string]$Path, [string]$Content)
@@ -2367,7 +2414,7 @@ function Add-LuaBeforeFinalReturn {
 function New-FoundationFixture {
     $fixture = Join-Path ([System.IO.Path]::GetTempPath()) ('eggy-foundation-' + [System.Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $fixture | Out-Null
-    Copy-Item -LiteralPath (Join-Path $repoRoot 'script') -Destination (Join-Path $fixture 'script') -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'LuaSource_云上同行') -Destination (Join-Path $fixture 'LuaSource_云上同行') -Recurse
     return $fixture
 }
 
@@ -2447,15 +2494,15 @@ Assert-Pass 'accepts the complete repository fixture' {
 }
 
 $requiredFiles = @(
-    'script/main.lua',
-    'script/adapters/u5_log.lua',
-    'script/adapters/u5_event.lua',
-    'script/core/logger.lua',
-    'script/core/event_bus.lua',
-    'script/core/object_registry.lua',
-    'script/core/game_flow.lua',
-    'script/config/events.lua',
-    'script/config/objects.lua'
+    'LuaSource_云上同行/main.lua',
+    'LuaSource_云上同行/adapters/u5_log.lua',
+    'LuaSource_云上同行/adapters/u5_event.lua',
+    'LuaSource_云上同行/core/logger.lua',
+    'LuaSource_云上同行/core/event_bus.lua',
+    'LuaSource_云上同行/core/object_registry.lua',
+    'LuaSource_云上同行/core/game_flow.lua',
+    'LuaSource_云上同行/config/events.lua',
+    'LuaSource_云上同行/config/objects.lua'
 )
 
 foreach ($relativePath in $requiredFiles) {
@@ -2470,7 +2517,7 @@ foreach ($relativePath in $requiredFiles) {
 Assert-Pass 'rejects forbidden sandbox libraries' {
     Assert-RejectedMutation -Name 'forbidden library' -ExpectedPattern '\[forbidden-runtime\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\core\logger.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\core\logger.lua'
         Add-LuaBeforeFinalReturn -Path $path -Content "local leaked = io.open`n"
     }
 }
@@ -2478,7 +2525,7 @@ Assert-Pass 'rejects forbidden sandbox libraries' {
 Assert-Pass 'rejects unresolved require targets' {
     Assert-RejectedMutation -Name 'invalid require' -ExpectedPattern '\[require-target\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\main.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\main.lua'
         Add-LuaBeforeFinalReturn -Path $path -Content "local leaked = require(`"outside.module`")`n"
     }
 }
@@ -2486,7 +2533,7 @@ Assert-Pass 'rejects unresolved require targets' {
 Assert-Pass 'rejects bare unresolved require targets' {
     Assert-RejectedMutation -Name 'bare invalid require' -ExpectedPattern '\[require-target\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\main.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\main.lua'
         Add-LuaBeforeFinalReturn -Path $path -Content "local leaked = require `"outside.module`"`n"
     }
 }
@@ -2494,7 +2541,7 @@ Assert-Pass 'rejects bare unresolved require targets' {
 Assert-Pass 'rejects require aliases' {
     Assert-RejectedMutation -Name 'require alias' -ExpectedPattern '\[require-target\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\main.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\main.lua'
         Add-LuaBeforeFinalReturn -Path $path -Content "local loader = require`nlocal leaked = loader(`"outside.module`")`n"
     }
 }
@@ -2502,7 +2549,7 @@ Assert-Pass 'rejects require aliases' {
 Assert-Pass 'rejects bare dynamic loading' {
     Assert-RejectedMutation -Name 'bare dynamic load' -ExpectedPattern '\[forbidden-runtime\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\core\logger.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\core\logger.lua'
         Add-LuaBeforeFinalReturn -Path $path -Content "local leaked = load `"return 1`"`n"
     }
 }
@@ -2510,7 +2557,7 @@ Assert-Pass 'rejects bare dynamic loading' {
 Assert-Pass 'does not let a closed long comment hide executable code' {
     Assert-RejectedMutation -Name 'long comment bypass' -ExpectedPattern '\[forbidden-runtime\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\core\logger.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\core\logger.lua'
         Add-LuaBeforeFinalReturn -Path $path -Content "--[=[说明]=] local leaked = io.open(`"x`")`n"
     }
 }
@@ -2518,7 +2565,7 @@ Assert-Pass 'does not let a closed long comment hide executable code' {
 Assert-Pass 'accepts platform and loader names inside strings and long comments' {
     Assert-AcceptedMutation -Name 'lexical masking' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\core\logger.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\core\logger.lua'
         $content = "local note = [=[LuaAPI EVENT io load require `"outside.module`"]=]`n"
         $content += "--[==[ LuaAPI EVENT os dofile require(`"outside.module`") ]==]`n"
         $content += "local quoted = `"require('outside.module') LuaAPI package debug`"`n"
@@ -2529,7 +2576,7 @@ Assert-Pass 'accepts platform and loader names inside strings and long comments'
 Assert-Pass 'rejects platform globals outside adapters' {
     Assert-RejectedMutation -Name 'platform leak' -ExpectedPattern '\[platform-boundary\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\main.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\main.lua'
         Add-LuaBeforeFinalReturn -Path $path -Content "local leaked = LuaAPI.log`n"
     }
 }
@@ -2537,7 +2584,7 @@ Assert-Pass 'rejects platform globals outside adapters' {
 Assert-Pass 'rejects global-event APIs in the logging adapter' {
     Assert-RejectedMutation -Name 'adapter ownership leak' -ExpectedPattern '\[platform-boundary\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\adapters\u5_log.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\adapters\u5_log.lua'
         Add-LuaBeforeFinalReturn -Path $path -Content "local leaked = LuaAPI.global_register_trigger_event`n"
     }
 }
@@ -2545,14 +2592,14 @@ Assert-Pass 'rejects global-event APIs in the logging adapter' {
 Assert-Pass 'rejects nonempty object configuration' {
     Assert-RejectedMutation -Name 'object id' -ExpectedPattern '\[objects-empty\]' -Mutate {
         param($fixture)
-        Write-Utf8File -Path (Join-Path $fixture 'script\config\objects.lua') -Content "return { THING = 123 }`n"
+        Write-Utf8File -Path (Join-Path $fixture 'LuaSource_云上同行\config\objects.lua') -Content "return { THING = 123 }`n"
     }
 }
 
 Assert-Pass 'rejects missing lifecycle members' {
     Assert-RejectedMutation -Name 'missing dispose' -ExpectedPattern '\[lifecycle\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\core\logger.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\core\logger.lua'
         $content = [System.IO.File]::ReadAllText($path, $utf8).Replace('function logger.dispose()', 'function logger.removed_dispose()')
         Write-Utf8File -Path $path -Content $content
     }
@@ -2561,7 +2608,7 @@ Assert-Pass 'rejects missing lifecycle members' {
 Assert-Pass 'rejects unresolved verification markers' {
     Assert-RejectedMutation -Name 'verification marker' -ExpectedPattern '\[verification-marker\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\core\logger.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\core\logger.lua'
         Add-LuaBeforeFinalReturn -Path $path -Content "-- TODO_VERIFY：此故障注入必须被拒绝。`n"
     }
 }
@@ -2569,7 +2616,7 @@ Assert-Pass 'rejects unresolved verification markers' {
 Assert-Pass 'rejects custom event literals outside config' {
     Assert-RejectedMutation -Name 'event literal' -ExpectedPattern '\[event-centralization\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\main.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\main.lua'
         Add-LuaBeforeFinalReturn -Path $path -Content "local leaked = `"CLOUD_JOURNEY.UNKNOWN`"`n"
     }
 }
@@ -2577,7 +2624,7 @@ Assert-Pass 'rejects custom event literals outside config' {
 Assert-Pass 'rejects event keys absent from central configuration' {
     Assert-RejectedMutation -Name 'missing event key' -ExpectedPattern '\[event-centralization\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\config\events.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\config\events.lua'
         $content = [System.IO.File]::ReadAllText($path, $utf8).Replace('CORE_READY', 'RENAMED_READY')
         Write-Utf8File -Path $path -Content $content
     }
@@ -2586,7 +2633,7 @@ Assert-Pass 'rejects event keys absent from central configuration' {
 Assert-Pass 'rejects trailing whitespace' {
     Assert-RejectedMutation -Name 'trailing whitespace' -ExpectedPattern '\[whitespace\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\core\logger.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\core\logger.lua'
         Add-LuaBeforeFinalReturn -Path $path -Content "local trailing = true `n"
     }
 }
@@ -2594,7 +2641,7 @@ Assert-Pass 'rejects trailing whitespace' {
 Assert-Pass 'rejects a missing final newline' {
     Assert-RejectedMutation -Name 'missing final newline' -ExpectedPattern '\[whitespace\]' -Mutate {
         param($fixture)
-        $path = Join-Path $fixture 'script\core\logger.lua'
+        $path = Join-Path $fixture 'LuaSource_云上同行\core\logger.lua'
         $content = [System.IO.File]::ReadAllText($path, $utf8).TrimEnd([char[]]@("`r", "`n"))
         Write-Utf8File -Path $path -Content $content
     }
@@ -2614,8 +2661,7 @@ exit 0
 Run:
 
 ```powershell
-$apiEvidencePath = Join-Path $env:LOCALAPPDATA 'EggyCloudJourney\evidence\EggyAPI.lua'
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\static\verify-foundation.tests.ps1 -EggyApiPath $apiEvidencePath
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\static\verify-foundation.tests.ps1
 ```
 
 Expected: exit `1`, with the positive case reporting that `tools/verify-foundation.ps1` cannot be found.
@@ -2627,7 +2673,7 @@ Create `tools/verify-foundation.ps1`:
 ```powershell
 param(
     [string]$Root = (Get-Location).Path,
-    [string]$EggyApiPath = (Join-Path $env:LOCALAPPDATA 'EggyCloudJourney\evidence\EggyAPI.lua')
+    [string]$EggyApiPath
 )
 
 Set-StrictMode -Version Latest
@@ -2637,6 +2683,9 @@ $rootPath = (Resolve-Path -LiteralPath $Root).Path
 $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
 $failures = [System.Collections.Generic.List[string]]::new()
 $luaLexicalPattern = '(?ms)--\[(?<commentEquals>=*)\[.*?\]\k<commentEquals>\]|--[^\r\n]*|"(?:\\.|[^"\\])*"|''(?:\\.|[^''\\])*''|\[(?<stringEquals>=*)\[.*?\]\k<stringEquals>\]'
+if ([string]::IsNullOrWhiteSpace($EggyApiPath)) {
+    $EggyApiPath = Join-Path $rootPath 'LuaSource_云上同行\EggyAPI.lua'
+}
 
 function Add-Failure {
     param([string]$Category, [string]$Message)
@@ -2696,15 +2745,15 @@ function Get-LuaRequireView {
 }
 
 $requiredFiles = @(
-    'script/main.lua',
-    'script/adapters/u5_log.lua',
-    'script/adapters/u5_event.lua',
-    'script/core/logger.lua',
-    'script/core/event_bus.lua',
-    'script/core/object_registry.lua',
-    'script/core/game_flow.lua',
-    'script/config/events.lua',
-    'script/config/objects.lua'
+    'LuaSource_云上同行/main.lua',
+    'LuaSource_云上同行/adapters/u5_log.lua',
+    'LuaSource_云上同行/adapters/u5_event.lua',
+    'LuaSource_云上同行/core/logger.lua',
+    'LuaSource_云上同行/core/event_bus.lua',
+    'LuaSource_云上同行/core/object_registry.lua',
+    'LuaSource_云上同行/core/game_flow.lua',
+    'LuaSource_云上同行/config/events.lua',
+    'LuaSource_云上同行/config/objects.lua'
 )
 
 foreach ($relativePath in $requiredFiles) {
@@ -2713,10 +2762,17 @@ foreach ($relativePath in $requiredFiles) {
     }
 }
 
-$scriptRoot = Join-Path $rootPath 'script'
+$runtimeRoot = Join-Path $rootPath 'LuaSource_云上同行'
 $luaFiles = @()
-if (Test-Path -LiteralPath $scriptRoot -PathType Container) {
-    $luaFiles = @(Get-ChildItem -LiteralPath $scriptRoot -Recurse -File -Filter '*.lua')
+if (Test-Path -LiteralPath $runtimeRoot -PathType Container) {
+    $generatedLuaEvidence = @(
+        (Join-Path $runtimeRoot 'EggyAPI.lua'),
+        (Join-Path $runtimeRoot 'EggyEditorAPI.lua'),
+        (Join-Path $runtimeRoot 'DebugTools.lua')
+    )
+    $luaFiles = @(Get-ChildItem -LiteralPath $runtimeRoot -Recurse -File -Filter '*.lua' | Where-Object {
+        $generatedLuaEvidence -notcontains $_.FullName
+    })
 }
 
 $forbiddenPatterns = @(
@@ -2743,7 +2799,7 @@ foreach ($file in $luaFiles) {
         }
     }
 
-    if (-not $relativePath.StartsWith('script/adapters/', [System.StringComparison]::Ordinal)) {
+    if (-not $relativePath.StartsWith('LuaSource_云上同行/adapters/', [System.StringComparison]::Ordinal)) {
         if ($codeOnly -match '\bLuaAPI\b|\bEVENT\b') {
             Add-Failure -Category 'platform-boundary' -Message $relativePath
         }
@@ -2766,13 +2822,13 @@ foreach ($file in $luaFiles) {
         if ($target -eq '') {
             $target = $requireMatch.Groups[2].Value
         }
-        $targetPath = Join-Path $rootPath ('script\' + $target.Replace('.', '\') + '.lua')
+        $targetPath = Join-Path $runtimeRoot ($target.Replace('.', '\') + '.lua')
         if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
             Add-Failure -Category 'require-target' -Message "$relativePath -> $target"
         }
     }
 
-    if ($relativePath -ne 'script/config/events.lua' -and $withoutComments -match 'CLOUD_JOURNEY\.[A-Z0-9_.]+') {
+    if ($relativePath -ne 'LuaSource_云上同行/config/events.lua' -and $withoutComments -match 'CLOUD_JOURNEY\.[A-Z0-9_.]+') {
         Add-Failure -Category 'event-centralization' -Message $relativePath
     }
 
@@ -2782,13 +2838,13 @@ foreach ($file in $luaFiles) {
 }
 
 $lifecycleModules = @{
-    'script/main.lua' = 'app'
-    'script/adapters/u5_log.lua' = 'u5_log'
-    'script/adapters/u5_event.lua' = 'u5_event'
-    'script/core/logger.lua' = 'logger'
-    'script/core/event_bus.lua' = 'event_bus'
-    'script/core/object_registry.lua' = 'object_registry'
-    'script/core/game_flow.lua' = 'game_flow'
+    'LuaSource_云上同行/main.lua' = 'app'
+    'LuaSource_云上同行/adapters/u5_log.lua' = 'u5_log'
+    'LuaSource_云上同行/adapters/u5_event.lua' = 'u5_event'
+    'LuaSource_云上同行/core/logger.lua' = 'logger'
+    'LuaSource_云上同行/core/event_bus.lua' = 'event_bus'
+    'LuaSource_云上同行/core/object_registry.lua' = 'object_registry'
+    'LuaSource_云上同行/core/game_flow.lua' = 'game_flow'
 }
 
 foreach ($entry in $lifecycleModules.GetEnumerator()) {
@@ -2804,16 +2860,16 @@ foreach ($entry in $lifecycleModules.GetEnumerator()) {
     }
 }
 
-$objectsPath = Join-Path $rootPath 'script\config\objects.lua'
+$objectsPath = Join-Path $runtimeRoot 'config\objects.lua'
 if (Test-Path -LiteralPath $objectsPath -PathType Leaf) {
     $objectsCode = Replace-LuaLexicalTokens -Text (Read-Utf8File -Path $objectsPath) -RemoveStrings $false
     $objectsCode = [regex]::Replace($objectsCode, '\s+', '')
     if ($objectsCode -ne 'return{}') {
-        Add-Failure -Category 'objects-empty' -Message 'script/config/objects.lua must return only an empty table'
+        Add-Failure -Category 'objects-empty' -Message 'LuaSource_云上同行/config/objects.lua must return only an empty table'
     }
 }
 
-$eventsPath = Join-Path $rootPath 'script\config\events.lua'
+$eventsPath = Join-Path $runtimeRoot 'config\events.lua'
 $definedEventKeys = @{}
 if (Test-Path -LiteralPath $eventsPath -PathType Leaf) {
     $eventsCode = Replace-LuaLexicalTokens -Text (Read-Utf8File -Path $eventsPath) -RemoveStrings $false
@@ -2828,7 +2884,7 @@ if (Test-Path -LiteralPath $eventsPath -PathType Leaf) {
 
 foreach ($file in $luaFiles) {
     $relativePath = Normalize-RelativePath -Path $file.FullName
-    if ($relativePath -ne 'script/config/events.lua') {
+    if ($relativePath -ne 'LuaSource_云上同行/config/events.lua') {
         $code = Replace-LuaLexicalTokens -Text (Read-Utf8File -Path $file.FullName) -RemoveStrings $true
         foreach ($eventUse in [regex]::Matches($code, '\bevents\.([A-Z][A-Z0-9_]*)\b')) {
             if (-not $definedEventKeys.ContainsKey($eventUse.Groups[1].Value)) {
@@ -2841,15 +2897,15 @@ foreach ($file in $luaFiles) {
 $logOwners = @($luaFiles | Where-Object {
     (Replace-LuaLexicalTokens -Text (Read-Utf8File -Path $_.FullName) -RemoveStrings $true) -match '\bLuaAPI\.log\b'
 })
-if ($logOwners.Count -ne 1 -or (Normalize-RelativePath -Path $logOwners[0].FullName) -ne 'script/adapters/u5_log.lua') {
-    Add-Failure -Category 'platform-boundary' -Message 'LuaAPI.log must appear only in script/adapters/u5_log.lua'
+if ($logOwners.Count -ne 1 -or (Normalize-RelativePath -Path $logOwners[0].FullName) -ne 'LuaSource_云上同行/adapters/u5_log.lua') {
+    Add-Failure -Category 'platform-boundary' -Message 'LuaAPI.log must appear only in LuaSource_云上同行/adapters/u5_log.lua'
 }
 
 $eventOwners = @($luaFiles | Where-Object {
     (Replace-LuaLexicalTokens -Text (Read-Utf8File -Path $_.FullName) -RemoveStrings $true) -match '\bEVENT\b|\bLuaAPI\.global_(?:register|unregister)_trigger_event\b'
 })
-if ($eventOwners.Count -ne 1 -or (Normalize-RelativePath -Path $eventOwners[0].FullName) -ne 'script/adapters/u5_event.lua') {
-    Add-Failure -Category 'platform-boundary' -Message 'EVENT and global trigger APIs must appear only in script/adapters/u5_event.lua'
+if ($eventOwners.Count -ne 1 -or (Normalize-RelativePath -Path $eventOwners[0].FullName) -ne 'LuaSource_云上同行/adapters/u5_event.lua') {
+    Add-Failure -Category 'platform-boundary' -Message 'EVENT and global trigger APIs must appear only in LuaSource_云上同行/adapters/u5_event.lua'
 }
 
 if ([string]::IsNullOrWhiteSpace($EggyApiPath) -or -not (Test-Path -LiteralPath $EggyApiPath -PathType Leaf)) {
@@ -2865,6 +2921,21 @@ if ([string]::IsNullOrWhiteSpace($EggyApiPath) -or -not (Test-Path -LiteralPath 
     )) {
         if ($apiText.IndexOf($symbol, [System.StringComparison]::Ordinal) -lt 0) {
             Add-Failure -Category 'api-export' -Message "Current export is missing $symbol"
+        }
+    }
+    foreach ($signature in @(
+        '---@param _event_desc any\[\]',
+        '---@param _callback function',
+        '---@return integer',
+        'function LuaAPI\.global_register_trigger_event\(_event_desc, _callback\)',
+        '---@param _id integer',
+        'function LuaAPI\.global_unregister_trigger_event\(_id\)',
+        '---@param _content string',
+        '---@param _log_level integer\?',
+        'function LuaAPI\.log\(_content, _log_level\)'
+    )) {
+        if ($apiText -notmatch $signature) {
+            Add-Failure -Category 'api-export' -Message "Current export does not match signature evidence: $signature"
         }
     }
 }
@@ -2894,9 +2965,8 @@ exit 0
 Run:
 
 ```powershell
-$apiEvidencePath = Join-Path $env:LOCALAPPDATA 'EggyCloudJourney\evidence\EggyAPI.lua'
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\static\verify-foundation.tests.ps1 -EggyApiPath $apiEvidencePath
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-foundation.ps1 -Root (Resolve-Path .) -EggyApiPath $apiEvidencePath
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\static\verify-foundation.tests.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-foundation.ps1 -Root (Resolve-Path .)
 ```
 
 Expected: both commands exit `0`; the first ends with `[PASS] verifier mutation suite`, and the second prints `[PASS] foundation static verification`.
@@ -2962,7 +3032,7 @@ Expected: the commit contains only the verifier and its mutation suite; local an
 
 **Files:**
 - Inspect: all Task 1-8 paths
-- Temporarily create, run, and delete: `script/tests/foundation_editor_harness.lua`
+- Temporarily create, run, and delete: `LuaSource_云上同行/tests/foundation_editor_harness.lua`
 - Do not create permanent profiling or developer-mode files
 - Do not commit if editor acceptance exposes a failure
 
@@ -2972,9 +3042,8 @@ Run:
 
 ```powershell
 git status --short --branch
-$apiEvidencePath = Join-Path $env:LOCALAPPDATA 'EggyCloudJourney\evidence\EggyAPI.lua'
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\static\verify-foundation.tests.ps1 -EggyApiPath $apiEvidencePath
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-foundation.ps1 -Root (Resolve-Path .) -EggyApiPath $apiEvidencePath
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\static\verify-foundation.tests.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-foundation.ps1 -Root (Resolve-Path .)
 git diff --check
 git diff --cached --check
 ```
@@ -2983,7 +3052,7 @@ Expected: branch `main`, no changed paths, both verification commands PASS, and 
 
 - [ ] **Step 2: Add and synchronize the exact temporary editor harness**
 
-Use `apply_patch` to create `script/tests/foundation_editor_harness.lua` with this exact content:
+Use `apply_patch` to create `LuaSource_云上同行/tests/foundation_editor_harness.lua` with this exact content:
 
 ```lua
 local app = require("main")
@@ -3146,7 +3215,7 @@ return harness
 
 Keep the PC editor, connected Eggitor panel, and VS Code workspace open. Save all Task 1-8 files plus the temporary harness and wait for every synchronization message.
 
-Expected: Eggitor reports successful file synchronization with no Lua compilation error. `git status --short` shows only `?? script/tests/foundation_editor_harness.lua`.
+Expected: Eggitor reports successful file synchronization with no Lua compilation error. `git status --short` shows only `?? LuaSource_云上同行/tests/foundation_editor_harness.lua`.
 
 - [ ] **Step 3: Run the first editor lifecycle pass**
 
@@ -3166,7 +3235,7 @@ In the documented Eggitor console's command input, execute exactly:
 require("tests.foundation_editor_harness").run()
 ```
 
-The temporary harness uses only production `script/` modules and sandbox-available Lua primitives; it does not use desktop-only `package`, replace U5 globals, or invent a platform API.
+The temporary harness uses only production modules in the physical `LuaSource_云上同行/` root (the logical `script/` namespace) and sandbox-available Lua primitives; it does not use desktop-only `package`, replace U5 globals, or invent a platform API.
 
 Expected:
 
@@ -3193,15 +3262,14 @@ require("tests.foundation_editor_harness").run()
 
 Expected: a second `[FOUNDATION_EDITOR_TEST][PASS] all cases` line, no duplicate registration behavior, and freshly isolated subscriber and object-warning counts. Stop the map normally and confirm cleanup again produces no Lua error.
 
-Use `apply_patch` to delete `script/tests/foundation_editor_harness.lua`, wait for Eggitor to synchronize the deletion, then run:
+Use `apply_patch` to delete `LuaSource_云上同行/tests/foundation_editor_harness.lua`, wait for Eggitor to synchronize the deletion, then run:
 
 ```powershell
-if (Test-Path -LiteralPath .\script\tests\foundation_editor_harness.lua) {
+if (Test-Path -LiteralPath .\LuaSource_云上同行\tests\foundation_editor_harness.lua) {
     throw 'Temporary editor harness still exists.'
 }
 git status --short --branch
-$apiEvidencePath = Join-Path $env:LOCALAPPDATA 'EggyCloudJourney\evidence\EggyAPI.lua'
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-foundation.ps1 -Root (Resolve-Path .) -EggyApiPath $apiEvidencePath
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-foundation.ps1 -Root (Resolve-Path .)
 ```
 
 Expected: the temporary file is absent, the worktree is clean, and the verifier passes.

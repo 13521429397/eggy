@@ -29,15 +29,23 @@ Rules:
 - Treat current Eggitor exports for scene objects, UI nodes, archives, achievements, presets, and skills as authoritative project data for the installed editor version.
 - Use official documentation for documented platform semantics, sandbox constraints, and supported workflows.
 - Prefer current exports and official documentation over memory, examples from unrelated maps, or assumptions. If an export conflicts with official documentation, stop implementation, keep the affected call behind an adapter, and mark it `TODO_VERIFY` until the discrepancy is resolved through current-editor validation.
-- Use only documented platform APIs and events. Never invent a U5 API, platform event name, object ID, UI ID, archive type, preset ID, or parameter order. Project-defined custom events are allowed only when registered centrally in `script/config/events.lua`.
+- Use only documented platform APIs and events. Never invent a U5 API, platform event name, object ID, UI ID, archive type, preset ID, or parameter order. Project-defined custom events are allowed only when registered centrally in `LuaSource_云上同行/config/events.lua`.
 - Put every uncertain platform call behind an adapter and mark it `TODO_VERIFY` until confirmed against the current export and an editor playtest.
+
+## Repository Runtime Root
+
+- `LuaSource_云上同行/` is the only connected physical Lua project root for this repository. Eggitor maps it to the platform's logical `script/` namespace.
+- Do not create a nested physical directory named `script` beneath the connected root. Production paths such as `LuaSource_云上同行/core/logger.lua` live directly beneath that root.
+- Runtime `require` names are relative to the connected root, for example `require("core.logger")`; never prefix them with `LuaSource_云上同行` or `script`.
+- Moving, renaming, or regenerating the connected root requires renewed evidence that Eggitor is connected, full synchronization succeeds, the entry point runs, and a nested root-relative `require` synchronizes and executes.
+- `LuaSource_云上同行/EggyAPI.lua`, `LuaSource_云上同行/EggyEditorAPI.lua`, and `LuaSource_云上同行/DebugTools.lua` are generated, read-only local evidence and must not be committed. `LuaSource_云上同行/eggy.json` is required committed project metadata.
 
 ## Runtime and Sandbox Rules
 
 - The target runtime is the Eggy Party custom Lua 5.4 sandbox, not standard desktop Lua 5.4.
-- All committed production runtime modules must stay under `script/`.
+- All committed production runtime modules must stay under the physical `LuaSource_云上同行/` root, which represents the sandbox's logical `script/` namespace.
 - Production logic must not depend on `io`, `os`, `package`, `debug`, LuaSocket, `loadfile`, `dofile`, dynamic code loading, filesystem access, or external Lua libraries.
-- `require` may load only project modules under `script/`.
+- In the platform's logical `script/` namespace, `require` may load only project modules beneath the mapped physical `LuaSource_云上同行/` root.
 - Do not rely on implicit conversion between strings and numbers.
 - Normal table keys must be numbers or strings. Use the platform `dict()` type when another key type is genuinely required.
 - Account for the platform's integer and fixed-point semantics, including overflow during conversion.
@@ -47,7 +55,7 @@ Rules:
 
 ## Initialization and API Usage
 
-- `script/main.lua` is an assembly and startup entry point. It must not contain chapter gameplay logic.
+- `LuaSource_云上同行/main.lua` is an assembly and startup entry point. It must not contain chapter gameplay logic.
 - `main.lua` executes before the real game start. Do not assume that game-time objects already exist there.
 - Acquire or initialize game-time objects through `EVENT.GAME_INIT` or an explicitly justified delayed-frame path.
 - Use `LuaAPI.call_delay_frame` when callback order matters. Do not infer ordering from very close second-based delays.
@@ -59,15 +67,15 @@ Rules:
 
 ## Architecture and Data Boundaries
 
-- `script/adapters/` owns all direct platform API access, including event, scene, UI, archive, and camera calls.
-- `script/core/` owns shared infrastructure such as game flow, pair sessions, the event bus, the object registry, and logging.
-- `script/systems/` owns cross-chapter systems.
-- `script/coop/` owns reusable cooperation mechanics.
-- `script/chapters/` owns chapter state machines.
-- `script/config/` owns runtime configuration derived from verified editor data.
-- All runtime references to real editor object IDs must be centralized in `script/config/objects.lua`; raw IDs may also appear in `data/object-registry.csv` as export evidence. Business logic must use stable logical keys through the object registry.
-- Event names must be registered centrally in `script/config/events.lua` and follow the naming rules documented later in `docs/event-naming.md`.
-- `data/object-registry.csv` is the editor-export evidence source; `script/config/objects.lua` is the verified runtime mapping. If they disagree, stop and report the drift instead of guessing a repair.
+- `LuaSource_云上同行/adapters/` owns all direct platform API access, including event, scene, UI, archive, and camera calls.
+- `LuaSource_云上同行/core/` owns shared infrastructure such as game flow, pair sessions, the event bus, the object registry, and logging.
+- `LuaSource_云上同行/systems/` owns cross-chapter systems.
+- `LuaSource_云上同行/coop/` owns reusable cooperation mechanics.
+- `LuaSource_云上同行/chapters/` owns chapter state machines.
+- `LuaSource_云上同行/config/` owns runtime configuration derived from verified editor data.
+- All runtime references to real editor object IDs must be centralized in `LuaSource_云上同行/config/objects.lua`; raw IDs may also appear in `data/object-registry.csv` as export evidence. Business logic must use stable logical keys through the object registry.
+- Event names must be registered centrally in `LuaSource_云上同行/config/events.lua` and follow the naming rules documented later in `docs/event-naming.md`.
+- `data/object-registry.csv` is the editor-export evidence source; `LuaSource_云上同行/config/objects.lua` is the verified runtime mapping. If they disagree, stop and report the drift instead of guessing a repair.
 - Lighting changes must go through `LightingDirector`.
 - Dynamic scene-object changes must go through `DynamicWorld`.
 - Camera changes must go through the camera adapter.
@@ -146,7 +154,7 @@ Lifecycle rules:
 After each Lua change, inspect at minimum:
 
 - forbidden libraries, dynamic loading, and invalid `require` paths;
-- hardcoded editor object IDs outside `script/config/objects.lua`;
+- hardcoded editor object IDs outside `LuaSource_云上同行/config/objects.lua`;
 - undocumented APIs and unresolved `TODO_VERIFY` markers;
 - unregistered or inconsistent event names;
 - event, timer, listener, and temporary-state cleanup symmetry;

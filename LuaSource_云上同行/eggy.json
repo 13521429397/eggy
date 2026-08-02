@@ -1,0 +1,13 @@
+{
+    "projectName": "云上同行", 
+    "projectID": "6a6f8536abc0fca321ab1fd3", 
+    "serverPort": 11704, 
+    "syncEnabled": true, 
+    "excludePatterns": [
+        ".vscode", 
+        ".git", 
+        "EggyAPI.lua", 
+        ".codemaker"
+    ], 
+    "version": "1.0.0"
+}

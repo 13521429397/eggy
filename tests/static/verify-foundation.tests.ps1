@@ -280,6 +280,40 @@ Assert-Pass 'rejects global-event APIs in the logging adapter' {
     }
 }
 
+Assert-Pass 'rejects LuaAPI table type dependency in the logging adapter' {
+    Assert-RejectedMutation -Name 'logging LuaAPI table type dependency' -ExpectedPattern '\[luaapi-namespace-type\]' -Mutate {
+        param($fixture)
+        $path = Join-Path $fixture 'LuaSource_云上同行\adapters\u5_log.lua'
+        Add-LuaBeforeFinalReturn -Path $path -Content "local namespace_is_table = type ( LuaAPI ) == `"table`"`n"
+    }
+}
+
+Assert-Pass 'rejects LuaAPI non-table type dependency in the event adapter' {
+    Assert-RejectedMutation -Name 'event LuaAPI non-table type dependency' -ExpectedPattern '\[luaapi-namespace-type\]' -Mutate {
+        param($fixture)
+        $path = Join-Path $fixture 'LuaSource_云上同行\adapters\u5_event.lua'
+        Add-LuaBeforeFinalReturn -Path $path -Content "local namespace_not_table = type(LuaAPI) ~= 'table'`n"
+    }
+}
+
+Assert-Pass 'rejects reverse LuaAPI table type dependency in the logging adapter' {
+    Assert-RejectedMutation -Name 'reverse logging LuaAPI table type dependency' -ExpectedPattern '\[luaapi-namespace-type\]' -Mutate {
+        param($fixture)
+        $path = Join-Path $fixture 'LuaSource_云上同行\adapters\u5_log.lua'
+        Add-LuaBeforeFinalReturn -Path $path -Content "local namespace_is_table = `"table`" == type ( LuaAPI )`n"
+    }
+}
+
+Assert-Pass 'rejects captured LuaAPI type dependency in the event adapter' {
+    Assert-RejectedMutation -Name 'captured event LuaAPI type dependency' -ExpectedPattern '\[luaapi-namespace-type\]' -Mutate {
+        param($fixture)
+        $path = Join-Path $fixture 'LuaSource_云上同行\adapters\u5_event.lua'
+        $content = "local namespace_type = type ( LuaAPI )`n"
+        $content += "local namespace_is_table = namespace_type == `"table`"`n"
+        Add-LuaBeforeFinalReturn -Path $path -Content $content
+    }
+}
+
 Assert-Pass 'rejects nonempty object configuration' {
     Assert-RejectedMutation -Name 'object id' -ExpectedPattern '\[objects-empty\]' -Mutate {
         param($fixture)

@@ -3,16 +3,28 @@ local u5_log = {}
 local initialized = false
 local platform_log = nil
 
+local function resolve_platform_log()
+    -- LuaAPI 在编辑器运行时是专用命名空间类型，只按成员是否可调用来验证边界。
+    local accessed, candidate = pcall(function()
+        return LuaAPI.log
+    end)
+    if not accessed or type(candidate) ~= "function" then
+        return nil
+    end
+    return candidate
+end
+
 function u5_log.init()
     if initialized then
         return true
     end
 
-    if type(LuaAPI) ~= "table" or type(LuaAPI.log) ~= "function" then
+    local candidate = resolve_platform_log()
+    if candidate == nil then
         return false
     end
 
-    platform_log = LuaAPI.log
+    platform_log = candidate
     initialized = true
     return true
 end

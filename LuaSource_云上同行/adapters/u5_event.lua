@@ -15,13 +15,22 @@ local function valid_logger(candidate)
     return type(candidate) == "table" and type(candidate.error) == "function"
 end
 
-local function valid_platform()
-    return type(LuaAPI) == "table"
-        and type(LuaAPI.global_register_trigger_event) == "function"
-        and type(LuaAPI.global_unregister_trigger_event) == "function"
-        and type(EVENT) == "table"
-        and EVENT.GAME_INIT ~= nil
-        and EVENT.GAME_END ~= nil
+local function resolve_platform()
+    if type(EVENT) ~= "table" or EVENT.GAME_INIT == nil or EVENT.GAME_END == nil then
+        return nil
+    end
+
+    -- LuaAPI 在编辑器运行时是专用命名空间类型，只按必需成员是否可调用来验证边界。
+    local accessed, candidate_register, candidate_unregister = pcall(function()
+        return LuaAPI.global_register_trigger_event, LuaAPI.global_unregister_trigger_event
+    end)
+    if not accessed
+        or type(candidate_register) ~= "function"
+        or type(candidate_unregister) ~= "function" then
+        return nil
+    end
+
+    return candidate_register, candidate_unregister, EVENT.GAME_INIT, EVENT.GAME_END
 end
 
 local function report(message)
@@ -101,17 +110,21 @@ function u5_event.init(candidate_logger)
         end
         return same_lifetime
     end
-    if not valid_logger(candidate_logger) or not valid_platform() then
+    if not valid_logger(candidate_logger) then
+        return false
+    end
+    local candidate_register, candidate_unregister, candidate_game_init, candidate_game_end = resolve_platform()
+    if candidate_register == nil then
         return false
     end
 
     -- 同一生命周期固定依赖快照，避免外部全局表或日志表被修改后改变适配器行为。
     logger = candidate_logger
     logger_error = candidate_logger.error
-    register_trigger = LuaAPI.global_register_trigger_event
-    unregister_trigger = LuaAPI.global_unregister_trigger_event
-    game_init_event = EVENT.GAME_INIT
-    game_end_event = EVENT.GAME_END
+    register_trigger = candidate_register
+    unregister_trigger = candidate_unregister
+    game_init_event = candidate_game_init
+    game_end_event = candidate_game_end
     owned_handles = {}
     initialized = true
     return true

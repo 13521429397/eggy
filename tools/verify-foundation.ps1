@@ -187,6 +187,12 @@ foreach ($file in $luaFiles) {
         }
     }
 
+    if ($relativePath -eq 'LuaSource_云上同行/adapters/u5_log.lua' -or $relativePath -eq 'LuaSource_云上同行/adapters/u5_event.lua') {
+        if ($codeOnly -match '\btype\s*\(\s*LuaAPI\s*\)') {
+            Add-Failure -Category 'luaapi-namespace-type' -Message "$relativePath must validate callable LuaAPI members without assuming a table namespace"
+        }
+    }
+
     if ($raw.IndexOf('TODO_VERIFY', [System.StringComparison]::Ordinal) -ge 0) {
         Add-Failure -Category 'verification-marker' -Message $relativePath
     }

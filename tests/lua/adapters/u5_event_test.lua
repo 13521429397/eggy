@@ -17,6 +17,23 @@ local function fresh(lua_api, event_values)
     return test.reload("adapters.u5_event")
 end
 
+local function with_lua_api_type(lua_api, callback)
+    local original_type = type
+    type = function(value)
+        if value == lua_api then
+            return "LuaAPI"
+        end
+        return original_type(value)
+    end
+
+    local results = table.pack(pcall(callback))
+    type = original_type
+    if not results[1] then
+        error(results[2], 0)
+    end
+    return table.unpack(results, 2, results.n)
+end
+
 test.test("u5_event validates dependency and platform surfaces", function()
     local errors = {}
     local adapter = fresh(nil, nil)
@@ -228,6 +245,32 @@ test.test("u5_event uses captured dependencies for an initialized lifetime", fun
     test.sequence(registrations, { "CAPTURED_GAME_INIT" })
     test.equal(#errors, 2)
     test.truthy(adapter.dispose())
+end)
+
+test.test("u5_event accepts the runtime LuaAPI namespace type", function()
+    local errors = {}
+    local unregistered = {}
+    local lua_api = {
+        global_register_trigger_event = function(event_description)
+            test.equal(event_description[1], "GAME_INIT")
+            return 70
+        end,
+        global_unregister_trigger_event = function(handle)
+            unregistered[#unregistered + 1] = handle
+        end,
+    }
+
+    with_lua_api_type(lua_api, function()
+        local adapter = fresh(lua_api, {
+            GAME_INIT = "GAME_INIT",
+            GAME_END = "GAME_END",
+        })
+        test.truthy(adapter.init(logger(errors)))
+        test.equal(adapter.on_game_init(function() end), 70)
+        test.truthy(adapter.unregister(70))
+        test.sequence(unregistered, { 70 })
+        test.truthy(adapter.dispose())
+    end)
 end)
 
 test.run()

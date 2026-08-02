@@ -136,4 +136,98 @@ test.test("u5_event retains failed cleanup for dispose retry", function()
     test.truthy(adapter.init(current_logger))
 end)
 
+test.test("u5_event retains a handle when registration reenters lifecycle methods", function()
+    local errors = {}
+    local nested_dispose_results = {}
+    local nested_registration_calls = 0
+    local nested_registration_result = true
+    local unregistered = {}
+    local adapter
+    adapter = fresh({
+        global_register_trigger_event = function()
+            nested_dispose_results[#nested_dispose_results + 1] = adapter.dispose()
+            nested_registration_calls = nested_registration_calls + 1
+            nested_registration_result = adapter.on_game_end(function() end)
+            return 40
+        end,
+        global_unregister_trigger_event = function(handle)
+            unregistered[#unregistered + 1] = handle
+        end,
+    }, {
+        GAME_INIT = "GAME_INIT",
+        GAME_END = "GAME_END",
+    })
+
+    test.truthy(adapter.init(logger(errors)))
+    test.equal(adapter.on_game_init(function() end), 40)
+    test.sequence(nested_dispose_results, { false })
+    test.equal(nested_registration_calls, 1)
+    test.nil_value(nested_registration_result)
+    test.truthy(adapter.dispose())
+    test.sequence(unregistered, { 40 })
+end)
+
+test.test("u5_event prevents recursive cleanup and retains a failed handle", function()
+    local errors = {}
+    local should_fail = true
+    local unregister_calls = {}
+    local nested_dispose_results = {}
+    local adapter
+    adapter = fresh({
+        global_register_trigger_event = function()
+            return 50
+        end,
+        global_unregister_trigger_event = function(handle)
+            unregister_calls[#unregister_calls + 1] = handle
+            nested_dispose_results[#nested_dispose_results + 1] = adapter.dispose()
+            if should_fail then
+                error("unregister failed")
+            end
+        end,
+    }, {
+        GAME_INIT = "GAME_INIT",
+        GAME_END = "GAME_END",
+    })
+    local current_logger = logger(errors)
+
+    test.truthy(adapter.init(current_logger))
+    test.equal(adapter.on_game_init(function() end), 50)
+    test.falsy(adapter.dispose())
+    test.sequence(unregister_calls, { 50 })
+    test.sequence(nested_dispose_results, { false })
+    should_fail = false
+    test.truthy(adapter.dispose())
+    test.sequence(unregister_calls, { 50, 50 })
+    test.sequence(nested_dispose_results, { false, false })
+    test.truthy(adapter.init(current_logger))
+end)
+
+test.test("u5_event uses captured dependencies for an initialized lifetime", function()
+    local errors = {}
+    local registrations = {}
+    local adapter = fresh({
+        global_register_trigger_event = function(event_description)
+            registrations[#registrations + 1] = event_description[1]
+            return 60
+        end,
+        global_unregister_trigger_event = function() end,
+    }, {
+        GAME_INIT = "CAPTURED_GAME_INIT",
+        GAME_END = "CAPTURED_GAME_END",
+    })
+    local current_logger = logger(errors)
+
+    test.truthy(adapter.init(current_logger))
+    LuaAPI = nil
+    EVENT = nil
+    current_logger.error = nil
+    test.truthy(adapter.init(current_logger))
+    test.falsy(adapter.init(logger(errors)))
+    test.equal(adapter.on_game_init(function() end), 60)
+    test.nil_value(adapter.on_game_end("bad"))
+    test.sequence(registrations, { "CAPTURED_GAME_INIT" })
+    test.equal(#errors, 2)
+    test.truthy(adapter.dispose())
+end)
+
 test.run()

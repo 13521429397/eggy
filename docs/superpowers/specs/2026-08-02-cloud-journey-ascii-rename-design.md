@@ -1,7 +1,7 @@
 # Cloud Journey ASCII Name Migration Design
 
 Date: 2026-08-02
-Status: Approved naming, pending implementation-plan review
+Status: Design and implementation plan approved; Eggitor/editor acceptance pending
 
 ## Goal
 

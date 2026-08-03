@@ -1,7 +1,7 @@
 # Foundation Module Design
 
 Status: Approved
-Project: Cloud Journey (`云上同行`)
+Project: Cloud Journey
 Date: 2026-08-02
 
 ## Goal
@@ -22,15 +22,15 @@ The implementation may rely on these currently documented capabilities:
 
 The manual explicitly documents `EVENT.GAME_INIT`, `EVENT.GAME_END`, `LuaAPI.global_register_trigger_event`, `LuaAPI.global_unregister_trigger_event`, and `LuaAPI.log`. These are the only platform surfaces required by this module. The current Eggitor 0.3.9 export confirms `global_register_trigger_event(any[], callback) -> integer`, `global_unregister_trigger_event(integer)`, `log(string, optional integer level)`, `GAME_INIT`, and `GAME_END`. The foundation logging adapter uses the supported one-argument form.
 
-The connected physical Eggitor project root is `LuaSource_云上同行/`. It is the repository counterpart of the platform manual's logical `script/` namespace; there is no nested physical `script/` directory. Production files live directly below the connected root, while runtime imports remain root-relative, such as `require("core.logger")`. Moving, renaming, or regenerating the root requires renewed connection, synchronization, entry-point, and nested-require evidence.
+The physical repository root is `LuaSource_CloudJourney/`, the intended Eggitor counterpart of the platform manual's logical `script/` namespace; there is no nested physical `script/` directory. Production files live directly below that root, while runtime imports remain root-relative, such as `require("core.logger")`. The initial Eggitor connection evidence predates the ASCII-root migration. Post-rename reconnect, full synchronization, entry-point, nested-require, and editor-acceptance evidence is pending.
 
-The connected project and its current `EggyAPI.lua` export are runtime-implementation prerequisites and now exist. If a later export conflicts with the manual or the recorded signatures, the affected adapter call must be marked `TODO_VERIFY` and excluded from editor-verified completion until resolved. Generated `EggyAPI.lua`, `EggyEditorAPI.lua`, and `DebugTools.lua` files are read-only local evidence and are not committed; `LuaSource_云上同行/eggy.json` is committed project metadata.
+The current `EggyAPI.lua` export exists as local API evidence, but the connected-project prerequisite for the renamed root remains pending until the post-rename editor gates pass. If a later export conflicts with the manual or the recorded signatures, the affected adapter call must be marked `TODO_VERIFY` and excluded from editor-verified completion until resolved. Generated `EggyAPI.lua`, `EggyEditorAPI.lua`, and `DebugTools.lua` files are read-only local evidence and are not committed; `LuaSource_CloudJourney/eggy.json` is committed project metadata.
 
 ## Scope and Boundaries
 
 The module will add:
 
-- a minimal `LuaSource_云上同行/main.lua` application entry point;
+- a minimal `LuaSource_CloudJourney/main.lua` application entry point;
 - logging and global-event adapters;
 - a platform-independent logger, event bus, object registry, and game-flow state holder;
 - central event and object configuration files; and
@@ -55,7 +55,7 @@ Except for `app.dispose()` and `u5_event.dispose()`, which report pending event 
 
 ### Application entry point
 
-`LuaSource_云上同行/main.lua` owns assembly only. It creates one application instance, calls `app.init()` exactly once during file load, records the returned status, and then returns the application table. `main.lua` does not continue into gameplay startup after a `false` result. A failed initialization whose cleanup completes enters `DISPOSED` and may be retried with `app.init()`. A failed cleanup enters `DISPOSING`; in that state only repeated `app.dispose()` calls are accepted until cleanup completes.
+`LuaSource_CloudJourney/main.lua` owns assembly only. It creates one application instance, calls `app.init()` exactly once during file load, records the returned status, and then returns the application table. `main.lua` does not continue into gameplay startup after a `false` result. A failed initialization whose cleanup completes enters `DISPOSED` and may be retried with `app.init()`. A failed cleanup enters `DISPOSING`; in that state only repeated `app.dispose()` calls are accepted until cleanup completes.
 
 Public surface:
 
@@ -74,7 +74,7 @@ During active cleanup, `app.dispose()` first calls the event adapter's `dispose(
 
 ### Platform adapters
 
-`LuaSource_云上同行/adapters/u5_log.lua` is the only module that calls `LuaAPI.log`.
+`LuaSource_CloudJourney/adapters/u5_log.lua` is the only module that calls `LuaAPI.log`.
 
 ```lua
 u5_log.init()
@@ -84,7 +84,7 @@ u5_log.dispose()
 
 It emits a stable line format: `[LEVEL][Source] message`. Values are converted explicitly rather than relying on implicit string/number conversion. `write()` calls `LuaAPI.log` through `pcall`, never raises a logging error to its caller, and returns `true` only when the protected call completes without a Lua error. Before initialization and after disposal it returns `false`. Reinitialization after disposal is supported.
 
-`LuaSource_云上同行/adapters/u5_event.lua` is the only module that refers to `EVENT` values or trigger-registration APIs.
+`LuaSource_CloudJourney/adapters/u5_event.lua` is the only module that refers to `EVENT` values or trigger-registration APIs.
 
 ```lua
 u5_event.init(logger)
@@ -102,7 +102,7 @@ The adapter records every successful registration handle. `on_game_init()` and `
 
 ### Logger
 
-`LuaSource_云上同行/core/logger.lua` contains no platform calls.
+`LuaSource_CloudJourney/core/logger.lua` contains no platform calls.
 
 ```lua
 logger.init(backend)
@@ -116,7 +116,7 @@ Logging before initialization or after disposal returns `false` without calling 
 
 ### Internal event bus
 
-`LuaSource_云上同行/core/event_bus.lua` is a synchronous, platform-independent bus.
+`LuaSource_CloudJourney/core/event_bus.lua` is a synchronous, platform-independent bus.
 
 ```lua
 event_bus.init(logger)
@@ -132,7 +132,7 @@ Event names must be non-empty strings and handlers must be functions. `subscribe
 
 ### Object registry
 
-`LuaSource_云上同行/core/object_registry.lua` provides a stable logical-key boundary without querying the editor.
+`LuaSource_CloudJourney/core/object_registry.lua` provides a stable logical-key boundary without querying the editor.
 
 ```lua
 object_registry.init(entries, logger)
@@ -143,11 +143,11 @@ object_registry.dispose()
 
 Before initialization and after disposal, `has()` returns `false` and `get()` returns `nil` without logging. `init()` after disposal resets the registry and is supported.
 
-Keys must be non-empty strings. `init()` validates the complete input before mutating registry state, rejects a non-table configuration or any invalid key, and returns `false` without retaining partial entries. Otherwise it returns `true`. `has()` returns a boolean. `get()` returns the configured value or `nil` for an unknown key and logs one warning per missing key per registry lifetime. The initial `LuaSource_云上同行/config/objects.lua` returns an empty table and contains no placeholder numeric IDs. Real values will be added only after they are copied or exported from the connected map and verified.
+Keys must be non-empty strings. `init()` validates the complete input before mutating registry state, rejects a non-table configuration or any invalid key, and returns `false` without retaining partial entries. Otherwise it returns `true`. `has()` returns a boolean. `get()` returns the configured value or `nil` for an unknown key and logs one warning per missing key per registry lifetime. The initial `LuaSource_CloudJourney/config/objects.lua` returns an empty table and contains no placeholder numeric IDs. Real values will be added only after they are copied or exported from the connected map and verified.
 
 ### Game flow
 
-`LuaSource_云上同行/core/game_flow.lua` owns only the foundation lifecycle state.
+`LuaSource_CloudJourney/core/game_flow.lua` owns only the foundation lifecycle state.
 
 ```lua
 game_flow.init(dependencies)
@@ -160,11 +160,11 @@ The `dependencies` table must contain `logger`, `eventBus`, and `events`. States
 
 The first `start()` transitions to `READY`, publishes the internal event `CLOUD_JOURNEY.CORE_READY`, and logs readiness. The state remains `READY` even if a subscriber fails; in that case `start()` returns `false` to surface the failed notification. A successful publish returns `true`. Repeated or otherwise out-of-state `start()` calls return `false` and do not republish the event. `dispose()` enters `DISPOSED`, is idempotent, and leaves `get_state()` returning `DISPOSED`.
 
-`LuaSource_云上同行/config/events.lua` is the only source for `CLOUD_JOURNEY.CORE_READY`. This is a project-defined internal event, not an invented platform event.
+`LuaSource_CloudJourney/config/events.lua` is the only source for `CLOUD_JOURNEY.CORE_READY`. This is a project-defined internal event, not an invented platform event.
 
 ## Runtime Flow
 
-1. The editor loads `LuaSource_云上同行/main.lua`, which constructs the application and calls `app.init()` exactly once.
+1. The editor loads `LuaSource_CloudJourney/main.lua`, which constructs the application and calls `app.init()` exactly once.
 2. `app.init()` assembles foundation modules without accessing game-time objects; `main.lua` records failure and does not start gameplay if initialization returns `false`.
 3. The event adapter registers documented `GAME_INIT` and `GAME_END` callbacks.
 4. `GAME_INIT` calls `game_flow.start()` once.
@@ -179,7 +179,7 @@ No timer, Tick loop, scene lookup, UI lookup, or dynamic object creation occurs 
 - Initialization and disposal are idempotent for every module; initialization after completed disposal is supported and resets module-lifetime state.
 - A failed platform registration is not stored as an active handle.
 - Event registrations and unregister operations remain paired in the event adapter.
-- No module may call another module's private state or refer directly to `LuaAPI` or `EVENT` outside `LuaSource_云上同行/adapters/`.
+- No module may call another module's private state or refer directly to `LuaAPI` or `EVENT` outside `LuaSource_CloudJourney/adapters/`.
 - Code comments explain non-obvious intent and lifecycle ownership in Chinese; identifiers and APIs remain English.
 - Before platform-facing Lua is implemented, the current `EggyAPI.lua` export must confirm the five manual-documented surfaces. A mismatch or unavailable version proof requires `TODO_VERIFY`; any additional platform call is out of scope unless it is documented and added to this design.
 
@@ -189,13 +189,13 @@ The implementation will include `tools/verify-foundation.ps1`. It must fail when
 
 - a required foundation file is missing;
 - runtime code references `io`, `os`, `package`, `debug`, LuaSocket, dynamic loading, or an invalid `require` target;
-- `LuaAPI` or `EVENT` appears outside `LuaSource_云上同行/adapters/`;
-- during the empty foundation phase, `LuaSource_云上同行/config/objects.lua` contains any object entry or numeric identifier;
+- `LuaAPI` or `EVENT` appears outside `LuaSource_CloudJourney/adapters/`;
+- during the empty foundation phase, `LuaSource_CloudJourney/config/objects.lua` contains any object entry or numeric identifier;
 - a foundation module omits its required `init()` or `dispose()` contract; or
-- a runtime module contains an unresolved `TODO_VERIFY` marker or an event name that is not defined in `LuaSource_云上同行/config/events.lua`; or
+- a runtime module contains an unresolved `TODO_VERIFY` marker or an event name that is not defined in `LuaSource_CloudJourney/config/events.lua`; or
 - whitespace checks fail.
 
-When verified map object data is introduced in a later module, the empty-object rule must be replaced rather than bypassed: the verifier will then require every runtime object ID to match its evidence row in `data/object-registry.csv` and will reject drift or IDs outside `LuaSource_云上同行/config/objects.lua`.
+When verified map object data is introduced in a later module, the empty-object rule must be replaced rather than bypassed: the verifier will then require every runtime object ID to match its evidence row in `data/object-registry.csv` and will reject drift or IDs outside `LuaSource_CloudJourney/config/objects.lua`.
 
 Static acceptance requires:
 
@@ -208,7 +208,7 @@ Static acceptance requires:
 Editor acceptance requires:
 
 1. Eggitor reports successful synchronization;
-2. a temporary `LuaSource_云上同行/tests/foundation_editor_harness.lua` file synchronizes, and the console can execute the root-relative nested import `require("tests.foundation_editor_harness")`;
+2. a temporary `LuaSource_CloudJourney/tests/foundation_editor_harness.lua` file synchronizes, and the console can execute the root-relative nested import `require("tests.foundation_editor_harness")`;
 3. the map starts without compilation, Trace, or parameter errors;
 4. the console records exactly one foundation-ready transition per run;
 5. `GAME_END` executes cleanup without a Lua error from the unregister calls; this does not claim platform-side confirmation beyond the documented API;

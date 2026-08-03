@@ -1,4 +1,4 @@
-package.path = "tests/lua/?.lua;LuaSource_云上同行/?.lua;" .. package.path
+package.path = "tests/lua/?.lua;LuaSource_CloudJourney/?.lua;" .. package.path
 
 local test = require("test_helper")
 

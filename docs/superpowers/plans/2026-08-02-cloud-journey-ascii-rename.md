@@ -239,7 +239,7 @@ Make these current-state corrections:
 - simplify duplicated headers to `Project: Cloud Journey`;
 - state that initial connection evidence predates the ASCII-root migration;
 - state that the root rename requires the new connection evidence recorded in this task;
-- replace the obsolete `eggy.json` hash with `4AF2697E64CE7F0472A2263CE9D424E5EB0EE64467CC7CFBA577AFD48ACFA852`;
+- replace the obsolete `eggy.json` hash with `756BEF7CDE19B1E44E7B6339565DBA9F87C06667B91D89820DB8067643E9E027`;
 - keep all executable commands on `LuaSource_CloudJourney`;
 - do not reintroduce the forbidden title literal.
 
@@ -269,7 +269,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\static\verify-fo
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-foundation.ps1 -Root (Resolve-Path .)
 ```
 
-Expected: 43 mutation cases pass, followed by `[PASS] verifier mutation suite` and `[PASS] foundation static verification`.
+Expected: 56 mutation cases pass, followed by `[PASS] verifier mutation suite` and `[PASS] foundation static verification`.
 
 - [ ] **Step 3: Prove the name, path, ignore, encoding, and metadata invariants**
 
@@ -286,7 +286,7 @@ $nonAsciiTracked = @(git -c core.quotepath=false ls-files | Where-Object { $_ -m
 if ($nonAsciiTracked.Count -ne 0) { throw "Non-ASCII tracked paths remain: $($nonAsciiTracked -join ', ')" }
 if (Test-Path -LiteralPath $oldRoot) { throw 'Legacy root remains.' }
 $metadataHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $newRoot 'eggy.json')).Hash
-if ($metadataHash -ne '4AF2697E64CE7F0472A2263CE9D424E5EB0EE64467CC7CFBA577AFD48ACFA852') { throw "Unexpected metadata hash: $metadataHash" }
+if ($metadataHash -ne '756BEF7CDE19B1E44E7B6339565DBA9F87C06667B91D89820DB8067643E9E027') { throw "Unexpected metadata hash: $metadataHash" }
 git check-ignore -v -- LuaSource_CloudJourney/.vscode/launch.json LuaSource_CloudJourney/EggyAPI.lua LuaSource_CloudJourney/EggyEditorAPI.lua LuaSource_CloudJourney/DebugTools.lua LuaSource_CloudJourney/log.txt
 git diff --check
 git diff --cached --check
@@ -384,7 +384,7 @@ Rejected: Keep localized path aliases | duplicate physical roots would create sy
 Confidence: high
 Scope-risk: moderate
 Directive: Keep Cloud Journey for display, LuaSource_CloudJourney for the physical root, and CLOUD_JOURNEY for runtime events
-Tested: 43-case verifier mutation suite; direct verifier; legacy-title and ASCII-path scans; metadata hash; Eggitor full sync; two consecutive editor acceptance runs; staged diff inspection
+Tested: 56-case verifier mutation suite; direct verifier; legacy-title and ASCII-path scans; metadata hash; Eggitor full sync; two consecutive editor acceptance runs; staged diff inspection
 Not-tested: Standalone Lua 5.4 behavior suite because no compatible runner is installed
 ```
 
